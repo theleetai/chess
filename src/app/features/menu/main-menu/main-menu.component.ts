@@ -35,6 +35,11 @@ export class MainMenuComponent implements OnInit {
     this.router.navigate(['/game']);
   }
 
+  startCreativeMode(): void {
+    this.gameStateService.setGameMode('creative');
+    this.router.navigate(['/builder']);
+  }
+
   startPlayerVsAI(): void {
     alert('This feature is coming soon!');
   }

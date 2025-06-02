@@ -1,28 +1,126 @@
 <div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
-  <!-- Chess Board Section -->
-  <div class="flex-1 flex flex-col items-center justify-center space-y-8">
-    <h1 class="text-3xl font-bold mb-4 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Custom Game Builder</h1>
+  <!-- Left Panel: Piece Palette -->
+  <div class="md:w-64 bg-gray-800 p-4 rounded-lg mb-4 md:mb-0 md:mr-4 flex flex-col">
+    <h2 class="text-xl font-bold mb-4">
+      <ng-container *ngIf="isCreativeMode">Creative Mode</ng-container>
+      <ng-container *ngIf="!isCreativeMode">Piece Palette</ng-container>
+    </h2>
+    
+    <!-- Piece Selection -->
+    <div class="grid grid-cols-6 md:grid-cols-2 gap-2 mb-6">
+      <div *ngFor="let piece of availablePieces" 
+           class="bg-gray-700 rounded-md p-2 cursor-grab hover:bg-gray-600 transition-all"
+           [class.ring-2]="selectedPieceType === piece.type && selectedPieceColor === piece.color"
+           [class.ring-blue-500]="selectedPieceType === piece.type && selectedPieceColor === piece.color"
+           (click)="selectPiece(piece.type, piece.color)"
+           draggable="true"
+           (dragstart)="onPaletteDragStart($event, piece.type, piece.color)">
+        <img [src]="piece.image" [alt]="piece.type" class="w-full h-auto">
+      </div>
+    </div>
+    
+    <!-- Player Selection -->
+    <div class="mb-6">
+      <h3 class="font-bold mb-2">Starting Player</h3>
+      <div class="flex space-x-2">
+        <button 
+          (click)="setStartingPlayer('white')" 
+          class="flex-1 p-2 rounded-md flex items-center justify-center space-x-2"
+          [class.bg-blue-600]="startingPlayer === 'white'"
+          [class.bg-gray-700]="startingPlayer !== 'white'">
+          <div class="w-4 h-4 rounded-full bg-white"></div>
+          <span>White</span>
+        </button>
+        <button 
+          (click)="setStartingPlayer('black')" 
+          class="flex-1 p-2 rounded-md flex items-center justify-center space-x-2"
+          [class.bg-blue-600]="startingPlayer === 'black'"
+          [class.bg-gray-700]="startingPlayer !== 'black'">
+          <div class="w-4 h-4 rounded-full bg-gray-900 border border-gray-600"></div>
+          <span>Black</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Board Controls -->
+    <div class="space-y-2 mt-auto">
+      <button 
+        (click)="clearBoard()" 
+        class="w-full p-3 bg-red-600 hover:bg-red-700 rounded-md transition-colors flex items-center justify-center space-x-2">
+        <i class="fas fa-trash"></i>
+        <span>Clear Board</span>
+      </button>
+      <button 
+        (click)="loadStandardSetup()" 
+        class="w-full p-3 bg-yellow-600 hover:bg-yellow-700 rounded-md transition-colors flex items-center justify-center space-x-2">
+        <i class="fas fa-chess-board"></i>
+        <span>Standard Setup</span>
+      </button>
+      
+      <!-- Add openings button only in creative mode -->
+      <button 
+        *ngIf="isCreativeMode"
+        (click)="openOpeningsDialog()"
+        class="w-full p-3 bg-purple-600 hover:bg-purple-700 rounded-md transition-colors flex items-center justify-center space-x-2">
+        <i class="fas fa-book"></i>
+        <span>Chess Openings</span>
+      </button>
+      
+      <button 
+        (click)="startGame()" 
+        [disabled]="!isValidBoard"
+        [class.opacity-50]="!isValidBoard"
+        [class.cursor-not-allowed]="!isValidBoard"
+        class="w-full p-3 bg-green-600 hover:bg-green-700 rounded-md transition-colors flex items-center justify-center space-x-2">
+        <i class="fas fa-play"></i>
+        <span>Start Game</span>
+      </button>
+      <button 
+        (click)="returnToMenu()" 
+        class="w-full p-3 bg-blue-600 hover:bg-blue-700 rounded-md transition-colors flex items-center justify-center space-x-2">
+        <i class="fas fa-home"></i>
+        <span>Main Menu</span>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Right Panel: Chess Board -->
+  <div class="flex-1 flex flex-col items-center justify-center">
+    <div class="mb-4 p-3 rounded-lg text-center" 
+         [class.bg-red-800]="!isValidBoard"
+         [class.bg-green-800]="isValidBoard">
+      <p [class.text-red-300]="!isValidBoard"
+         [class.text-green-300]="isValidBoard">
+        <i [class.fa-times-circle]="!isValidBoard"
+           [class.fa-check-circle]="isValidBoard" 
+           class="fas mr-2"></i>
+        {{ validationMessage }}
+      </p>
+    </div>
     
     <div class="relative">
       <!-- Chess board -->
-      <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl chess-board">
+      <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl">
         <ng-container *ngFor="let row of boardRows">
           <ng-container *ngFor="let col of boardCols">
             <div 
-              [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative square'"
-              [class.light]="(row + col) % 2 === 1"
-              [class.dark]="(row + col) % 2 === 0"
-              (click)="onSquareClick(row, col)">
+              [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative'"
+              (click)="onSquareClick(row, col)"
+              (contextmenu)="removePiece(row, col); $event.preventDefault()"
+              (dragover)="onDragOver($event, row, col)"
+              (drop)="onDrop($event, row, col)">
               
               <!-- Piece -->
-              <ng-container *ngIf="board.squares[row][col]">
-                <div class="relative w-11/12 h-11/12 chess-piece cursor-pointer">
-                  <img 
-                    [src]="board.squares[row][col]?.image" 
-                    [alt]="board.squares[row][col]?.color + ' ' + board.squares[row][col]?.type"
-                    class="w-full h-full object-contain">
-                </div>
-              </ng-container>
+              <div *ngIf="getPieceAt(row, col)" 
+                   class="w-11/12 h-11/12 cursor-grab"
+                   draggable="true"
+                   (dragstart)="onDragStart($event, row, col)"
+                   (dragend)="onDragEnd()">
+                <img 
+                  [src]="getPieceAt(row, col)?.image" 
+                  [alt]="getPieceAt(row, col)?.type"
+                  class="w-full h-full object-contain">
+              </div>
             </div>
           </ng-container>
         </ng-container>
@@ -43,107 +141,51 @@
       </div>
     </div>
     
-    <!-- Error Message -->
-    <div *ngIf="errorMessage" class="bg-red-900 text-white p-3 rounded-lg text-center">
-      {{ errorMessage }}
-    </div>
-    
-    <!-- Starting Player Selection -->
-    <div class="flex justify-center space-x-4 mt-4">
-      <button 
-        (click)="setStartingPlayer('white')" 
-        class="bg-white text-gray-900 px-4 py-2 rounded-lg flex items-center"
-        [class.ring-2]="board.currentPlayer === 'white'">
-        <div class="w-6 h-6 rounded-full bg-white mr-2 border border-gray-400"></div>
-        White Moves First
-      </button>
-      <button 
-        (click)="setStartingPlayer('black')" 
-        class="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center"
-        [class.ring-2]="board.currentPlayer === 'black'">
-        <div class="w-6 h-6 rounded-full bg-gray-900 mr-2 border border-gray-600"></div>
-        Black Moves First
-      </button>
-    </div>
-    
-    <!-- Action Buttons -->
-    <div class="flex justify-center space-x-4 mt-4">
-      <button 
-        (click)="startGame()" 
-        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center font-bold">
-        <i class="fas fa-play mr-2"></i> Start Game
-      </button>
-      <button 
-        (click)="resetToStandardBoard()" 
-        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
-        <i class="fas fa-chess-board mr-2"></i> Standard Setup
-      </button>
-      <button 
-        (click)="clearBoard()" 
-        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center">
-        <i class="fas fa-trash mr-2"></i> Clear Board
-      </button>
-      <button 
-        (click)="returnToMenu()" 
-        class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center">
-        <i class="fas fa-home mr-2"></i> Main Menu
-      </button>
+    <div class="mt-6 text-center max-w-xl">
+      <h3 class="text-lg font-bold mb-2">Instructions</h3>
+      <ul class="text-gray-300 text-sm space-y-2 text-left">
+        <ng-container *ngIf="isCreativeMode">
+          <li><i class="fas fa-paint-brush mr-2"></i> <strong>Creative Mode:</strong> Create unusual positions and explore chess concepts.</li>
+        </ng-container>
+        <li><i class="fas fa-hand-paper mr-2"></i> <strong>Drag and drop</strong> pieces from the palette onto the board.</li>
+        <li><i class="fas fa-arrows-alt mr-2"></i> <strong>Drag and drop</strong> pieces on the board to move them around.</li>
+        <li><i class="fas fa-mouse-pointer mr-2"></i> You can also <strong>click</strong> a piece in the palette, then click on the board to place it.</li>
+        <li><i class="fas fa-right-click mr-2"></i> <strong>Right-click</strong> on a piece to remove it.</li>
+        <li><i class="fas fa-info-circle mr-2"></i> You must have exactly one king of each color on the board to start a game.</li>
+      </ul>
     </div>
   </div>
-  
-  <!-- Piece Selection Panel -->
-  <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0 flex flex-col shadow-xl">
-    <h2 class="text-2xl font-bold mb-6">Piece Selection</h2>
+</div>
+
+<!-- Add Chess Openings Modal -->
+<div *ngIf="showOpeningsModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+  <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-lg w-full mx-4">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-2xl font-bold">Chess Openings</h2>
+      <button (click)="showOpeningsModal = false" class="text-gray-400 hover:text-white">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
     
-    <!-- Color Selection -->
-    <div class="mb-6">
-      <h3 class="text-lg mb-2 text-gray-300">Color</h3>
-      <div class="flex space-x-4">
-        <button 
-          (click)="selectedPieceColor = 'white'" 
-          class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg flex items-center justify-center"
-          [class.ring-2]="selectedPieceColor === 'white'">
-          <div class="w-6 h-6 rounded-full bg-white mr-2"></div>
-          White
-        </button>
-        <button 
-          (click)="selectedPieceColor = 'black'" 
-          class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg flex items-center justify-center"
-          [class.ring-2]="selectedPieceColor === 'black'">
-          <div class="w-6 h-6 rounded-full bg-gray-900 mr-2 border border-gray-600"></div>
-          Black
-        </button>
+    <div class="max-h-96 overflow-y-auto">
+      <div *ngFor="let opening of chessOpenings" 
+           class="bg-gray-700 p-4 rounded-lg mb-3 hover:bg-gray-600 transition-colors cursor-pointer"
+           (click)="loadOpening(opening.id)">
+        <div class="flex justify-between items-center">
+          <div>
+            <h3 class="font-bold">{{ opening.name }}</h3>
+            <p class="text-sm text-gray-400">{{ opening.moves }}</p>
+          </div>
+        </div>
       </div>
     </div>
     
-    <!-- Piece Type Selection -->
-    <div>
-      <h3 class="text-lg mb-2 text-gray-300">Piece Type</h3>
-      <div class="grid grid-cols-3 gap-3">
-        <button 
-          *ngFor="let type of pieceTypes" 
-          (click)="selectedPieceType = type" 
-          class="bg-gray-700 hover:bg-gray-600 p-3 rounded-lg flex flex-col items-center"
-          [class.ring-2]="selectedPieceType === type">
-          <img 
-            [src]="getPieceImage(type, selectedPieceColor)" 
-            [alt]="type" 
-            class="w-12 h-12 object-contain mb-1">
-          <span class="text-sm capitalize">{{ type }}</span>
-        </button>
-      </div>
-    </div>
-    
-    <!-- Instructions -->
-    <div class="mt-auto bg-gray-700 p-4 rounded-lg text-sm text-gray-300 mt-6">
-      <h3 class="font-bold mb-2">Instructions:</h3>
-      <ul class="list-disc pl-5 space-y-1">
-        <li>Click on an empty square to place the selected piece</li>
-        <li>Click on a piece to remove it</li>
-        <li>Set which player moves first</li>
-        <li>Click Start Game when your setup is ready</li>
-      </ul>
-      <p class="mt-2 text-yellow-400">Both kings must be present to start a game</p>
+    <div class="flex justify-center mt-6">
+      <button 
+        (click)="showOpeningsModal = false" 
+        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
+        Close
+      </button>
     </div>
   </div>
 </div> 

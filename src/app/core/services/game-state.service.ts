@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-export type GameMode = 'player-vs-player' | 'player-vs-bot' | 'player-vs-ai' | 'custom' | null;
+export type GameMode = 'player-vs-player' | 'player-vs-bot' | 'player-vs-ai' | 'custom' | 'creative' | null;
 
 @Injectable({
   providedIn: 'root'
@@ -49,7 +49,8 @@ export class GameStateService {
     return mode === 'player-vs-player' || 
            mode === 'player-vs-bot' || 
            mode === 'player-vs-ai' || 
-           mode === 'custom';
+           mode === 'custom' ||
+           mode === 'creative';
   }
   
   // Settings methods

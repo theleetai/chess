@@ -20,8 +20,15 @@
     </button>
     
     <button 
-      (click)="startCustomGame()" 
+      (click)="startCreativeMode()" 
       class="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white font-bold py-4 px-6 rounded-xl transition-colors shadow-lg flex items-center justify-center space-x-3">
+      <i class="fas fa-paint-brush fa-lg"></i>
+      <span class="text-xl">Creative Mode</span>
+    </button>
+    
+    <button 
+      (click)="startCustomGame()" 
+      class="bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 text-white font-bold py-4 px-6 rounded-xl transition-colors shadow-lg flex items-center justify-center space-x-3">
       <i class="fas fa-chess-board fa-lg"></i>
       <span class="text-xl">Custom Game</span>
     </button>
