@@ -1,0 +1,31 @@
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
+  <div class="text-center">
+    <h1 class="text-5xl font-bold mb-8">Chess Game</h1>
+    
+    <div class="flex flex-col space-y-4 w-64">
+      <button 
+        (click)="startPlayerVsPlayer()" 
+        class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+        Player vs Player
+      </button>
+      
+      <button 
+        (click)="startPlayerVsBot()" 
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+        Player vs Bot
+      </button>
+      
+      <button 
+        (click)="startPlayerVsAI()" 
+        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors">
+        Player vs AI
+      </button>
+      
+      <button 
+        (click)="openSettings()" 
+        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors mt-4">
+        Settings
+      </button>
+    </div>
+  </div>
+</div> 

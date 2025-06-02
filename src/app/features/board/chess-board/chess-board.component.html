@@ -1,0 +1,104 @@
+<div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
+  <!-- Chess Board -->
+  <div class="flex-1 flex items-center justify-center">
+    <div class="relative">
+      <!-- Board -->
+      <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl">
+        <ng-container *ngFor="let row of boardRows">
+          <ng-container *ngFor="let col of boardCols">
+            <div 
+              [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative'"
+              (click)="onSquareClick(row, col)">
+              
+              <!-- Piece -->
+              <ng-container *ngIf="board.squares[row][col]">
+                <img 
+                  [src]="board.squares[row][col]?.image" 
+                  alt="{{ board.squares[row][col]?.color }} {{ board.squares[row][col]?.type }}"
+                  class="w-11/12 h-11/12 object-contain">
+              </ng-container>
+              
+              <!-- Highlight selected piece -->
+              <div 
+                *ngIf="board.selectedPiece && 
+                      board.selectedPiece.position.row === row && 
+                      board.selectedPiece.position.col === col"
+                class="absolute inset-0 border-4 border-yellow-400 pointer-events-none">
+              </div>
+              
+              <!-- Highlight legal moves -->
+              <div 
+                *ngIf="isLegalMove(row, col)"
+                class="absolute inset-0 bg-yellow-400 bg-opacity-50 rounded-full w-1/3 h-1/3 m-auto pointer-events-none">
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+      
+      <!-- File labels (a-h) -->
+      <div class="flex justify-around mt-2 px-1">
+        <ng-container *ngFor="let col of boardCols">
+          <div class="text-center w-16">{{ 'abcdefgh'[col] }}</div>
+        </ng-container>
+      </div>
+      
+      <!-- Rank labels (1-8) -->
+      <div class="absolute left-0 top-0 h-full flex flex-col justify-around -ml-6">
+        <ng-container *ngFor="let row of boardRows">
+          <div class="text-center h-16 flex items-center">{{ row + 1 }}</div>
+        </ng-container>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Game Info Panel -->
+  <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0">
+    <h2 class="text-2xl font-bold mb-4">Game Info</h2>
+    
+    <!-- Current Turn -->
+    <div class="mb-6">
+      <p class="text-lg mb-2">Current Turn</p>
+      <div 
+        [class]="'w-6 h-6 rounded-full mr-2 inline-block ' + 
+                (board.currentPlayer === 'white' ? 'bg-white' : 'bg-black')">
+      </div>
+      <span class="capitalize">{{ board.currentPlayer }}</span>
+    </div>
+    
+    <!-- Game Status -->
+    <div class="mb-6">
+      <p *ngIf="board.isCheck" class="text-red-500 font-bold">Check!</p>
+      <p *ngIf="board.isCheckmate" class="text-red-500 font-bold">Checkmate!</p>
+      <p *ngIf="board.isStalemate" class="text-yellow-500 font-bold">Stalemate!</p>
+    </div>
+    
+    <!-- Move History -->
+    <div class="mb-6">
+      <p class="text-lg mb-2">Move History</p>
+      <div class="bg-gray-700 rounded p-2 h-64 overflow-y-auto">
+        <div *ngIf="board.moveHistory.length === 0" class="text-gray-400">
+          No moves yet
+        </div>
+        <div *ngFor="let move of board.moveHistory; let i = index" class="mb-1">
+          <span class="text-gray-400">{{ i + 1 }}.</span> {{ move }}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Buttons -->
+    <div class="flex space-x-2">
+      <button 
+        (click)="resetGame()" 
+        class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex-1">
+        Reset
+      </button>
+      
+      <button 
+        (click)="returnToMenu()" 
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex-1">
+        Menu
+      </button>
+    </div>
+  </div>
+</div> 
