@@ -127,13 +127,26 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // If the game was loaded from a saved state, don't reset
     if (!this.gameStateService.isCustomGame()) {
-    // Reset the game state
-    this.gameService.resetGame();
+      // Reset the game state
+      this.gameService.resetGame();
     }
     
     // If we're in player vs bot mode, subscribe to player moves to trigger bot responses
     if (this.gameStateService.isPlayerVsBot()) {
       this.setupBotMoves();
+      
+      // Patch the bot service to check for pre-moves after a move
+      const originalMakeBotMove = this.botService.makeBotMove;
+      this.botService.makeBotMove = () => {
+        originalMakeBotMove.call(this.botService);
+        
+        // After a short delay to let the move complete, check for pre-moves
+        setTimeout(() => {
+          if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0) {
+            this.executeNextPreMove();
+          }
+        }, 500);
+      };
     }
     
     // Update evaluation score periodically
@@ -249,9 +262,14 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     if (this.showMoveAnalysis && lastMove) {
       this.getMoveAnalysis();
     }
-    
-    // Clear pre-moves when a real move is made
-    this.clearPreMoves();
+
+    // Execute pre-moves if it's now the player's turn and we have pre-moves queued
+    if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0 && !this.isReplayMode) {
+      // Small delay to allow UI to update first
+      setTimeout(() => {
+        this.executeNextPreMove();
+      }, 300);
+    }
   }
   
   // Get analysis for the last move
@@ -769,13 +787,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     this.preMoveTo = { row, col };
     
     // Get the original position of the piece
-    let originalPosition: Position;
-    const origPos = this.getOriginalPositionOfVirtualPieceAt(this.preMoveFrom.row, this.preMoveFrom.col);
-    if (origPos) {
-      originalPosition = origPos;
-    } else {
-      originalPosition = this.preMoveFrom;
-    }
+    const originalPosition = this.preMoveFrom;
     
     // Create a unique ID for this pre-move
     const pieceId = this.getPieceKey(originalPosition.row, originalPosition.col);
@@ -794,6 +806,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // Update virtual positions
     this.updateVirtualPositions();
+    
+    console.log(`Added pre-move: ${originalPosition.row},${originalPosition.col} to ${row},${col}`);
+    console.log(`Pre-move queue now has ${this.preMoveQueue.length} moves`);
     
     // Reset for next pre-move
     this.preMoveFrom = null;
@@ -1189,20 +1204,34 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     const piece = this.board.squares[row][col];
     
-    // Allow dragging own pieces even when it's not your turn (for pre-moves)
-    if (!piece || (piece.color !== this.board.currentPlayer && piece.color !== 'white')) {
+    if (!piece) {
       event.preventDefault();
       return;
     }
     
-    // If it's not player's turn, start a pre-move
-    if (piece.color !== this.board.currentPlayer) {
+    // Allow dragging own pieces even when it's not your turn (for pre-moves)
+    if (piece.color === 'white' && this.board.currentPlayer === 'black' &&
+        (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsPlayer())) {
+      // Start a pre-move
       this.preMoveFrom = { row, col };
       this.preMoveTo = null;
-    } else {
+      
+      // Set data to transfer
+      if (event.dataTransfer) {
+        event.dataTransfer.setData('text/plain', `premove:${row},${col}`);
+        event.dataTransfer.effectAllowed = 'move';
+      }
+      return;
+    }
+    
+    // Only allow dragging pieces of the current player for normal moves
+    if (piece.color !== this.board.currentPlayer) {
+      event.preventDefault();
+      return;
+    }
+    
     this.draggedPiece = piece;
     this.gameService.selectPiece(row, col);
-    }
     
     // Set data to transfer
     if (event.dataTransfer) {
@@ -1219,16 +1248,30 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // For normal moves
     if (this.draggedPiece) {
-    // Check if this is a legal move
-    if (this.isLegalMove(row, col)) {
-      event.preventDefault(); // Allow the drop
+      // Check if this is a legal move
+      if (this.isLegalMove(row, col)) {
+        event.preventDefault(); // Allow the drop
       }
       return;
     }
     
-    // For pre-moves
+    // For pre-moves, check if the move would be valid
     if (this.preMoveFrom) {
-      event.preventDefault(); // Always allow pre-move drops
+      const fromRow = this.preMoveFrom.row;
+      const fromCol = this.preMoveFrom.col;
+      const piece = this.board.squares[fromRow][fromCol];
+      
+      if (piece) {
+        // Calculate what would be legal moves for this piece
+        this.gameService.selectPiece(fromRow, fromCol);
+        const legalMoves = [...this.board.legalMoves]; // Create a copy
+        this.gameService.clearSelection(); // Clear the selection to not affect the UI
+        
+        // Check if the target square is a legal move
+        if (legalMoves.some(move => move.row === row && move.col === col)) {
+          event.preventDefault(); // Allow the drop
+        }
+      }
     }
   }
   
@@ -1238,10 +1281,29 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     if (this.isReplayMode || this.showPromotionModal) return;
     
+    const data = event.dataTransfer?.getData('text/plain');
+    
     // Handle pre-moves
-    if (this.preMoveFrom && !this.draggedPiece) {
-      this.preMoveTo = { row, col };
-      this.setPreMoveDestination(row, col);
+    if (data?.startsWith('premove:') && this.preMoveFrom) {
+      // Get the piece we're trying to move
+      const fromRow = this.preMoveFrom.row;
+      const fromCol = this.preMoveFrom.col;
+      const piece = this.board.squares[fromRow][fromCol];
+      
+      if (piece) {
+        // Calculate what would be legal moves for this piece
+        this.gameService.selectPiece(fromRow, fromCol);
+        const legalMoves = [...this.board.legalMoves]; // Create a copy
+        this.gameService.clearSelection(); // Clear the selection to not affect the UI
+        
+        // Check if the target square is a legal move
+        if (legalMoves.some(move => move.row === row && move.col === col)) {
+          this.preMoveTo = { row, col };
+          this.setPreMoveDestination(row, col);
+        }
+      }
+      
+      this.preMoveFrom = null;
       return;
     }
     
