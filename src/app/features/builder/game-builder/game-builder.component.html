@@ -1,0 +1,149 @@
+<div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
+  <!-- Chess Board Section -->
+  <div class="flex-1 flex flex-col items-center justify-center space-y-8">
+    <h1 class="text-3xl font-bold mb-4 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Custom Game Builder</h1>
+    
+    <div class="relative">
+      <!-- Chess board -->
+      <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl chess-board">
+        <ng-container *ngFor="let row of boardRows">
+          <ng-container *ngFor="let col of boardCols">
+            <div 
+              [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative square'"
+              [class.light]="(row + col) % 2 === 1"
+              [class.dark]="(row + col) % 2 === 0"
+              (click)="onSquareClick(row, col)">
+              
+              <!-- Piece -->
+              <ng-container *ngIf="board.squares[row][col]">
+                <div class="relative w-11/12 h-11/12 chess-piece cursor-pointer">
+                  <img 
+                    [src]="board.squares[row][col]?.image" 
+                    [alt]="board.squares[row][col]?.color + ' ' + board.squares[row][col]?.type"
+                    class="w-full h-full object-contain">
+                </div>
+              </ng-container>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+      
+      <!-- File labels (a-h) -->
+      <div class="flex justify-around mt-2 px-1">
+        <ng-container *ngFor="let col of boardCols">
+          <div class="text-center w-16 text-gray-300 font-bold">{{ 'abcdefgh'[col] }}</div>
+        </ng-container>
+      </div>
+      
+      <!-- Rank labels (1-8) -->
+      <div class="absolute left-0 top-0 h-full flex flex-col justify-around -ml-6">
+        <ng-container *ngFor="let row of boardRows">
+          <div class="text-center h-16 flex items-center text-gray-300 font-bold">{{ row + 1 }}</div>
+        </ng-container>
+      </div>
+    </div>
+    
+    <!-- Error Message -->
+    <div *ngIf="errorMessage" class="bg-red-900 text-white p-3 rounded-lg text-center">
+      {{ errorMessage }}
+    </div>
+    
+    <!-- Starting Player Selection -->
+    <div class="flex justify-center space-x-4 mt-4">
+      <button 
+        (click)="setStartingPlayer('white')" 
+        class="bg-white text-gray-900 px-4 py-2 rounded-lg flex items-center"
+        [class.ring-2]="board.currentPlayer === 'white'">
+        <div class="w-6 h-6 rounded-full bg-white mr-2 border border-gray-400"></div>
+        White Moves First
+      </button>
+      <button 
+        (click)="setStartingPlayer('black')" 
+        class="bg-gray-800 text-white px-4 py-2 rounded-lg flex items-center"
+        [class.ring-2]="board.currentPlayer === 'black'">
+        <div class="w-6 h-6 rounded-full bg-gray-900 mr-2 border border-gray-600"></div>
+        Black Moves First
+      </button>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="flex justify-center space-x-4 mt-4">
+      <button 
+        (click)="startGame()" 
+        class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg flex items-center font-bold">
+        <i class="fas fa-play mr-2"></i> Start Game
+      </button>
+      <button 
+        (click)="resetToStandardBoard()" 
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+        <i class="fas fa-chess-board mr-2"></i> Standard Setup
+      </button>
+      <button 
+        (click)="clearBoard()" 
+        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center">
+        <i class="fas fa-trash mr-2"></i> Clear Board
+      </button>
+      <button 
+        (click)="returnToMenu()" 
+        class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg flex items-center">
+        <i class="fas fa-home mr-2"></i> Main Menu
+      </button>
+    </div>
+  </div>
+  
+  <!-- Piece Selection Panel -->
+  <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0 flex flex-col shadow-xl">
+    <h2 class="text-2xl font-bold mb-6">Piece Selection</h2>
+    
+    <!-- Color Selection -->
+    <div class="mb-6">
+      <h3 class="text-lg mb-2 text-gray-300">Color</h3>
+      <div class="flex space-x-4">
+        <button 
+          (click)="selectedPieceColor = 'white'" 
+          class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg flex items-center justify-center"
+          [class.ring-2]="selectedPieceColor === 'white'">
+          <div class="w-6 h-6 rounded-full bg-white mr-2"></div>
+          White
+        </button>
+        <button 
+          (click)="selectedPieceColor = 'black'" 
+          class="flex-1 bg-gray-700 hover:bg-gray-600 py-2 rounded-lg flex items-center justify-center"
+          [class.ring-2]="selectedPieceColor === 'black'">
+          <div class="w-6 h-6 rounded-full bg-gray-900 mr-2 border border-gray-600"></div>
+          Black
+        </button>
+      </div>
+    </div>
+    
+    <!-- Piece Type Selection -->
+    <div>
+      <h3 class="text-lg mb-2 text-gray-300">Piece Type</h3>
+      <div class="grid grid-cols-3 gap-3">
+        <button 
+          *ngFor="let type of pieceTypes" 
+          (click)="selectedPieceType = type" 
+          class="bg-gray-700 hover:bg-gray-600 p-3 rounded-lg flex flex-col items-center"
+          [class.ring-2]="selectedPieceType === type">
+          <img 
+            [src]="getPieceImage(type, selectedPieceColor)" 
+            [alt]="type" 
+            class="w-12 h-12 object-contain mb-1">
+          <span class="text-sm capitalize">{{ type }}</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Instructions -->
+    <div class="mt-auto bg-gray-700 p-4 rounded-lg text-sm text-gray-300 mt-6">
+      <h3 class="font-bold mb-2">Instructions:</h3>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>Click on an empty square to place the selected piece</li>
+        <li>Click on a piece to remove it</li>
+        <li>Set which player moves first</li>
+        <li>Click Start Game when your setup is ready</li>
+      </ul>
+      <p class="mt-2 text-yellow-400">Both kings must be present to start a game</p>
+    </div>
+  </div>
+</div> 

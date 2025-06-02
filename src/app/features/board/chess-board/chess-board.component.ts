@@ -1,11 +1,13 @@
 import { Component, OnInit, OnDestroy, inject, HostBinding, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { trigger, style, animate, transition } from '@angular/animations';
 import { GameService } from '../../../core/services/game.service';
 import { BotService } from '../../../core/services/bot.service';
 import { GameStateService } from '../../../core/services/game-state.service';
 import { ChessEngineService, EngineResult } from '../../../core/services/chess-engine.service';
+import { GamePersistenceService } from '../../../core/services/game-persistence.service';
 import { Piece, Position, PieceType, PieceColor, Move } from '../../../core/models/piece.model';
 import { Subscription, interval, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,7 +15,7 @@ import { takeUntil } from 'rxjs/operators';
 @Component({
   selector: 'app-chess-board',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './chess-board.component.html',
   styleUrls: ['./chess-board.component.css'],
   animations: [
@@ -43,6 +45,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   protected gameStateService = inject(GameStateService);
   private router = inject(Router);
   private engineService = inject(ChessEngineService);
+  private persistenceService = inject(GamePersistenceService);
   
   private botMoveSubscription?: Subscription;
   private destroy$ = new Subject<void>();
@@ -86,11 +89,22 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   // Evaluation bar
   evaluationScore = 0;
   
+  // Save game modal
+  showSaveGameModal = false;
+  gameName = '';
+  
+  // Move analysis
+  showMoveAnalysis = true;
+  currentMoveEvaluation: string = '';
+  
   constructor(private elementRef: ElementRef) {}
   
   ngOnInit(): void {
-    // Reset the game state
-    this.gameService.resetGame();
+    // If the game was loaded from a saved state, don't reset
+    if (!this.gameStateService.isCustomGame()) {
+      // Reset the game state
+      this.gameService.resetGame();
+    }
     
     // If we're in player vs bot mode, subscribe to player moves to trigger bot responses
     if (this.gameStateService.isPlayerVsBot()) {
@@ -108,6 +122,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
           this.updateEvaluation();
         }
       });
+      
+    // Set move analysis visibility
+    this.showMoveAnalysis = this.gameStateService.showMoveAnalysis();
   }
   
   ngOnDestroy(): void {
@@ -119,6 +136,13 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     // Complete the destroy subject
     this.destroy$.next();
     this.destroy$.complete();
+  }
+  
+  // Check if eval bar should be visible
+  get shouldShowEvalBar(): boolean {
+    return this.gameStateService.shouldShowEvalBar(
+      this.board.isCheckmate || this.board.isStalemate || this.resignedPlayer !== null
+    );
   }
   
   // Set up the bot to respond to player moves
@@ -172,6 +196,47 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // Update evaluation after move
     this.updateEvaluation();
+    
+    // Get move analysis if enabled
+    if (this.showMoveAnalysis && lastMove) {
+      this.getMoveAnalysis();
+    }
+  }
+  
+  // Get analysis for the last move
+  getMoveAnalysis(): void {
+    if (!this.showMoveAnalysis || !this.board.lastMove) return;
+    
+    // Only use external engines for analysis
+    if (this.engineService.engineType === 'local') return;
+    
+    this.engineService.getBestMove(this.board, this.board.currentPlayer)
+      .subscribe({
+        next: (result: EngineResult) => {
+          if (result.success) {
+            const evalScore = result.evaluation;
+            let evalText = '';
+            
+            // Determine if the last move was good or bad
+            if (Math.abs(evalScore) < 0.3) {
+              evalText = 'Equal position';
+            } else if (evalScore > 1.5) {
+              evalText = 'White has a clear advantage';
+            } else if (evalScore < -1.5) {
+              evalText = 'Black has a clear advantage';
+            } else if (evalScore > 0.3) {
+              evalText = 'White is slightly better';
+            } else {
+              evalText = 'Black is slightly better';
+            }
+            
+            this.currentMoveEvaluation = evalText;
+          }
+        },
+        error: () => {
+          this.currentMoveEvaluation = '';
+        }
+      });
   }
   
   // Handle square click
@@ -316,6 +381,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     this.resignedPlayer = null;
     this.evaluationScore = 0;
     this.updateEvaluation();
+    this.currentMoveEvaluation = '';
   }
   
   // Get winner text
@@ -341,6 +407,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // Hide game over modal if it was shown
     this.showGameOverModal = false;
+    
+    // Clear move evaluation
+    this.currentMoveEvaluation = '';
   }
   
   // Exit replay mode
@@ -348,7 +417,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     this.isReplayMode = false;
     
     // Return to current game state
-    this.gameService.setReplayState(this.board.moveHistory.length);
+    this.gameService.setReplayState(this.gameService.getCurrentGameState().history.length - 1);
     
     // If game was over, show the game over modal again
     if (this.board.isCheckmate || this.board.isStalemate || this.resignedPlayer) {
@@ -359,7 +428,11 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   // Navigate through replay moves
   nextMove(): void {
     if (!this.isReplayMode) return;
-    if (this.currentReplayMove < this.board.moveHistory.length) {
+    
+    // Calculate the max move index
+    const maxMoveIndex = this.gameService.getCurrentGameState().history.length - 1;
+    
+    if (this.currentReplayMove < maxMoveIndex) {
       this.currentReplayMove++;
       this.gameService.setReplayState(this.currentReplayMove);
       
@@ -382,7 +455,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // Update last move highlight
     if (this.currentReplayMove > 0) {
-      const board = this.gameService.getBoardAtMove(this.currentReplayMove);
+      const state = this.gameService.getCurrentGameState();
+      const board = state.history[this.currentReplayMove];
+      
       if (board.lastMove) {
         this.lastMovedFrom = board.lastMove.from;
         this.lastMovedTo = board.lastMove.to;
@@ -498,6 +573,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     // Update the evaluation
     this.updateEvaluation();
+    
+    // Clear current move evaluation
+    this.currentMoveEvaluation = '';
   }
   
   // Show a hint for the current player
@@ -691,5 +769,23 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     }
     
     return moveCount;
+  }
+  
+  // Show save game modal
+  showSaveGame(): void {
+    if (this.isReplayMode) return;
+    
+    this.gameName = `Game ${new Date().toLocaleString()}`;
+    this.showSaveGameModal = true;
+  }
+  
+  // Save the current game
+  saveGame(): void {
+    if (!this.gameName.trim()) {
+      this.gameName = `Game ${new Date().toLocaleString()}`;
+    }
+    
+    this.persistenceService.saveGame(this.gameName);
+    this.showSaveGameModal = false;
   }
 } 

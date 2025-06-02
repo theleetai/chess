@@ -42,6 +42,27 @@
               <div class="absolute left-7 top-1 bg-green-500 w-4 h-4 rounded-full transition-all duration-300"></div>
             </div>
           </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Evaluation Bar</label>
+            <select 
+              [(ngModel)]="evalBarVisibility" 
+              (change)="updateEvalBarSettings()"
+              class="bg-gray-800 text-white px-3 py-1 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="always">Always Show</option>
+              <option value="after-game">After Game Ends</option>
+              <option value="never">Never Show</option>
+            </select>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Show Move Analysis</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600" (click)="toggleMoveAnalysis()">
+              <div class="absolute top-1 w-4 h-4 rounded-full transition-all duration-300"
+                   [class.left-7]="showMoveAnalysis"
+                   [class.left-1]="!showMoveAnalysis"
+                   [class.bg-green-500]="showMoveAnalysis"
+                   [class.bg-gray-400]="!showMoveAnalysis"></div>
+            </div>
+          </div>
         </div>
       </div>
       

@@ -18,6 +18,11 @@ export const routes: Routes = [
     data: { animation: 'settings' }
   },
   {
+    path: 'builder',
+    loadComponent: () => import('./features/builder/game-builder/game-builder.component').then(m => m.GameBuilderComponent),
+    data: { animation: 'builder' }
+  },
+  {
     path: '**',
     redirectTo: ''
   }

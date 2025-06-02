@@ -1,6 +1,7 @@
 <div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
   <!-- Evaluation Bar -->
-  <div class="hidden md:flex flex-col items-center mr-4 w-6 h-96 self-center">
+  <div class="hidden md:flex flex-col items-center mr-4 w-6 h-96 self-center" 
+       *ngIf="shouldShowEvalBar">
     <div class="h-full w-full bg-gray-700 rounded-full overflow-hidden relative">
       <div 
         [style.height.%]="50 + (evaluationScore * 5)" 
@@ -170,6 +171,17 @@
         [disabled]="isReplayMode || board.isCheckmate || board.isStalemate">
         <i class="fas fa-flag mr-2"></i> Resign
       </button>
+      <button 
+        (click)="showSaveGame()" 
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center"
+        [disabled]="isReplayMode">
+        <i class="fas fa-save mr-2"></i> Save
+      </button>
+    </div>
+    
+    <!-- Move Analysis -->
+    <div *ngIf="currentMoveEvaluation && showMoveAnalysis" class="mt-4 bg-gray-800 p-3 rounded-lg text-center">
+      <p class="text-gray-300">Analysis: <span class="font-semibold">{{ currentMoveEvaluation }}</span></p>
     </div>
   </div>
   
@@ -372,6 +384,36 @@
           (click)="closeHint()" 
           class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg">
           Got it
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Save Game Modal -->
+  <div *ngIf="showSaveGameModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4 text-center">Save Game</h2>
+      <p class="text-center mb-6 text-gray-300">Enter a name for your saved game:</p>
+      
+      <div class="mb-6">
+        <input 
+          type="text" 
+          [(ngModel)]="gameName" 
+          class="w-full bg-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Game name">
+      </div>
+      
+      <div class="flex space-x-4">
+        <button 
+          (click)="saveGame()" 
+          class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+          Save
+        </button>
+        
+        <button 
+          (click)="showSaveGameModal = false" 
+          class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+          Cancel
         </button>
       </div>
     </div>

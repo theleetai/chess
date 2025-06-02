@@ -881,4 +881,219 @@ export class GameService {
     
     return true;
   }
+
+  // Get the current game state for saving
+  getCurrentGameState(): { currentState: Board, history: Board[] } {
+    return {
+      currentState: this.createBoardCopy(this.boardState()),
+      history: [...this.gameHistory]
+    };
+  }
+  
+  // Load a saved game state
+  loadGameState(state: Board, history: Board[]): void {
+    this.boardState.set(this.createBoardCopy(state));
+    this.gameHistory = history.map(board => this.createBoardCopy(board));
+  }
+  
+  // Custom game builder methods
+  
+  // Create an empty board with no pieces
+  createEmptyBoard(): void {
+    const emptyBoard = Array(this.BOARD_SIZE)
+      .fill(null)
+      .map(() => Array(this.BOARD_SIZE).fill(null));
+      
+    this.boardState.set({
+      squares: emptyBoard,
+      currentPlayer: 'white',
+      moveHistory: [],
+      whiteKingPosition: { row: -1, col: -1 }, // Invalid position initially
+      blackKingPosition: { row: -1, col: -1 }, // Invalid position initially
+      isCheck: false,
+      isCheckmate: false,
+      isStalemate: false,
+      selectedPiece: null,
+      legalMoves: [],
+      capturedWhitePieces: [],
+      capturedBlackPieces: [],
+      lastMove: null,
+      whiteKingMoved: false,
+      blackKingMoved: false,
+      whiteKingsideRookMoved: false,
+      whiteQueensideRookMoved: false,
+      blackKingsideRookMoved: false,
+      blackQueensideRookMoved: false
+    });
+    
+    // Reset game history
+    this.gameHistory = [this.createBoardCopy(this.boardState())];
+  }
+  
+  // Place a piece on the board during custom setup
+  placePiece(type: PieceType, color: PieceColor, row: number, col: number): boolean {
+    if (row < 0 || row >= this.BOARD_SIZE || col < 0 || col >= this.BOARD_SIZE) {
+      return false; // Invalid position
+    }
+    
+    this.boardState.update(state => {
+      const newSquares = state.squares.map(r => [...r]);
+      
+      // Create the new piece
+      const piece = this.createPiece(type, color, row, col);
+      
+      // Update king position if placing a king
+      let whiteKingPosition = state.whiteKingPosition;
+      let blackKingPosition = state.blackKingPosition;
+      
+      if (type === 'king') {
+        if (color === 'white') {
+          // Remove old white king if exists
+          for (let r = 0; r < this.BOARD_SIZE; r++) {
+            for (let c = 0; c < this.BOARD_SIZE; c++) {
+              const p = newSquares[r][c];
+              if (p && p.type === 'king' && p.color === 'white') {
+                newSquares[r][c] = null;
+              }
+            }
+          }
+          whiteKingPosition = { row, col };
+        } else {
+          // Remove old black king if exists
+          for (let r = 0; r < this.BOARD_SIZE; r++) {
+            for (let c = 0; c < this.BOARD_SIZE; c++) {
+              const p = newSquares[r][c];
+              if (p && p.type === 'king' && p.color === 'black') {
+                newSquares[r][c] = null;
+              }
+            }
+          }
+          blackKingPosition = { row, col };
+        }
+      }
+      
+      // Place the piece
+      newSquares[row][col] = piece;
+      
+      return {
+        ...state,
+        squares: newSquares,
+        whiteKingPosition,
+        blackKingPosition
+      };
+    });
+    
+    // Update game history
+    this.gameHistory = [this.createBoardCopy(this.boardState())];
+    
+    return true;
+  }
+  
+  // Remove a piece from the board during custom setup
+  removePiece(row: number, col: number): boolean {
+    if (row < 0 || row >= this.BOARD_SIZE || col < 0 || col >= this.BOARD_SIZE) {
+      return false; // Invalid position
+    }
+    
+    const board = this.boardState();
+    const piece = board.squares[row][col];
+    
+    if (!piece) {
+      return false; // No piece to remove
+    }
+    
+    this.boardState.update(state => {
+      const newSquares = state.squares.map(r => [...r]);
+      
+      // Update king position if removing a king
+      let whiteKingPosition = state.whiteKingPosition;
+      let blackKingPosition = state.blackKingPosition;
+      
+      if (piece.type === 'king') {
+        if (piece.color === 'white') {
+          whiteKingPosition = { row: -1, col: -1 }; // Invalid position
+        } else {
+          blackKingPosition = { row: -1, col: -1 }; // Invalid position
+        }
+      }
+      
+      // Remove the piece
+      newSquares[row][col] = null;
+      
+      return {
+        ...state,
+        squares: newSquares,
+        whiteKingPosition,
+        blackKingPosition
+      };
+    });
+    
+    // Update game history
+    this.gameHistory = [this.createBoardCopy(this.boardState())];
+    
+    return true;
+  }
+  
+  // Set the current player during custom setup
+  setCurrentPlayer(color: PieceColor): void {
+    this.boardState.update(state => ({
+      ...state,
+      currentPlayer: color
+    }));
+    
+    // Update game history
+    this.gameHistory = [this.createBoardCopy(this.boardState())];
+  }
+  
+  // Validate custom board setup
+  validateCustomBoard(): { valid: boolean, message: string } {
+    const board = this.boardState();
+    
+    // Check for white king
+    if (board.whiteKingPosition.row === -1) {
+      return { valid: false, message: 'White king is missing' };
+    }
+    
+    // Check for black king
+    if (board.blackKingPosition.row === -1) {
+      return { valid: false, message: 'Black king is missing' };
+    }
+    
+    // Check if the current player's king is in check
+    const currentColor = board.currentPlayer;
+    const enemyColor = currentColor === 'white' ? 'black' : 'white';
+    const kingPosition = currentColor === 'white' ? board.whiteKingPosition : board.blackKingPosition;
+    
+    // Check if the king is in check
+    const isInCheck = this.isSquareUnderAttack(
+      kingPosition.row, 
+      kingPosition.col, 
+      enemyColor, 
+      board.squares
+    );
+    
+    // Update check status but don't save it yet
+    if (isInCheck) {
+      return { valid: false, message: `${currentColor} king is in check` };
+    }
+    
+    return { valid: true, message: 'Valid board setup' };
+  }
+  
+  // Start a game from custom setup
+  startFromCustomSetup(): boolean {
+    const validation = this.validateCustomBoard();
+    
+    if (!validation.valid) {
+      return false;
+    }
+    
+    // Update game state (check, checkmate, stalemate)
+    this.updateGameState();
+    
+    // Reset history to just the initial state
+    this.gameHistory = [this.createBoardCopy(this.boardState())];
+    
+    return true;
+  }
 } 
