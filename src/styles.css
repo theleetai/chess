@@ -1,3 +1,64 @@
 @import "tailwindcss";
 
 /* You can add global styles to this file, and also import other style files */
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #1a202c;
+  color: #e2e8f0;
+}
+
+/* Button hover effects */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+/* Common animation */
+.fade-in {
+  animation: fadeIn 0.3s ease-in forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Page transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Container styling */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Card styling */
+.card {
+  background-color: #2d3748;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+}

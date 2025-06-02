@@ -1,104 +1,232 @@
 <div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
-  <!-- Chess Board -->
-  <div class="flex-1 flex items-center justify-center">
-    <div class="relative">
-      <!-- Board -->
-      <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl">
-        <ng-container *ngFor="let row of boardRows">
-          <ng-container *ngFor="let col of boardCols">
-            <div 
-              [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative'"
-              (click)="onSquareClick(row, col)">
-              
-              <!-- Piece -->
-              <ng-container *ngIf="board.squares[row][col]">
-                <img 
-                  [src]="board.squares[row][col]?.image" 
-                  alt="{{ board.squares[row][col]?.color }} {{ board.squares[row][col]?.type }}"
-                  class="w-11/12 h-11/12 object-contain">
-              </ng-container>
-              
-              <!-- Highlight selected piece -->
+  <!-- Chess Board Section -->
+  <div class="flex-1 flex flex-col items-center justify-center space-y-8">
+    <!-- Board with captured pieces above/below -->
+    <div class="flex flex-col items-center">
+      <!-- Black captured pieces -->
+      <div class="flex flex-wrap justify-center mb-4 h-16 bg-gray-800 rounded-lg p-2 w-full">
+        <div *ngFor="let piece of board.capturedWhitePieces" class="mx-1 captured-piece" [@pieceAnimation]>
+          <img [src]="piece.image" [alt]="piece.type" class="w-8 h-8">
+        </div>
+        <div *ngIf="board.capturedWhitePieces.length === 0" class="text-gray-500 text-sm italic flex items-center">
+          No captured pieces
+        </div>
+      </div>
+      
+      <div class="relative">
+        <!-- Chess board -->
+        <div class="grid grid-cols-8 gap-0 border-4 border-gray-700 shadow-xl chess-board">
+          <ng-container *ngFor="let row of boardRows">
+            <ng-container *ngFor="let col of boardCols">
               <div 
-                *ngIf="board.selectedPiece && 
-                      board.selectedPiece.position.row === row && 
-                      board.selectedPiece.position.col === col"
-                class="absolute inset-0 border-4 border-yellow-400 pointer-events-none">
+                [class]="getSquareColor(row, col) + ' w-16 h-16 flex items-center justify-center relative square'"
+                [class.light]="(row + col) % 2 === 1"
+                [class.dark]="(row + col) % 2 === 0"
+                [class.selected]="board.selectedPiece && 
+                           board.selectedPiece.position.row === row && 
+                           board.selectedPiece.position.col === col"
+                [class.last-move]="isLastMove(row, col)"
+                (click)="onSquareClick(row, col)"
+                (dragover)="onDragOver($event, row, col)"
+                (drop)="onDrop($event, row, col)">
+                
+                <!-- Piece with animations and drag support -->
+                <ng-container *ngIf="board.squares[row][col]">
+                  <div 
+                    class="relative w-11/12 h-11/12 chess-piece" 
+                    [@pieceAnimation]
+                    [class.threatened]="isUnderThreat(row, col)"
+                    [class.cursor-grab]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode"
+                    [draggable]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode"
+                    (dragstart)="onDragStart($event, row, col)"
+                    (dragend)="onDragEnd()">
+                    <img 
+                      [src]="board.squares[row][col]?.image" 
+                      [alt]="board.squares[row][col]?.color + ' ' + board.squares[row][col]?.type"
+                      class="w-full h-full object-contain"
+                      [class.opacity-90]="board.squares[row][col]?.color !== board.currentPlayer || isReplayMode"
+                      [class.scale-110]="board.selectedPiece && 
+                                       board.selectedPiece.position.row === row && 
+                                       board.selectedPiece.position.col === col">
+                  </div>
+                </ng-container>
+                
+                <!-- Highlight legal moves -->
+                <div *ngIf="isLegalMove(row, col)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div *ngIf="!board.squares[row][col]" 
+                       class="legal-move-indicator"
+                       [@highlightAnimation]></div>
+                  <div *ngIf="board.squares[row][col]" 
+                       class="legal-capture-indicator"
+                       [@highlightAnimation]></div>
+                </div>
               </div>
-              
-              <!-- Highlight legal moves -->
-              <div 
-                *ngIf="isLegalMove(row, col)"
-                class="absolute inset-0 bg-yellow-400 bg-opacity-50 rounded-full w-1/3 h-1/3 m-auto pointer-events-none">
-              </div>
-            </div>
+            </ng-container>
           </ng-container>
-        </ng-container>
+        </div>
+        
+        <!-- File labels (a-h) -->
+        <div class="flex justify-around mt-2 px-1">
+          <ng-container *ngFor="let col of boardCols">
+            <div class="text-center w-16 text-gray-300 font-bold">{{ 'abcdefgh'[col] }}</div>
+          </ng-container>
+        </div>
+        
+        <!-- Rank labels (1-8) -->
+        <div class="absolute left-0 top-0 h-full flex flex-col justify-around -ml-6">
+          <ng-container *ngFor="let row of boardRows">
+            <div class="text-center h-16 flex items-center text-gray-300 font-bold">{{ row + 1 }}</div>
+          </ng-container>
+        </div>
       </div>
       
-      <!-- File labels (a-h) -->
-      <div class="flex justify-around mt-2 px-1">
-        <ng-container *ngFor="let col of boardCols">
-          <div class="text-center w-16">{{ 'abcdefgh'[col] }}</div>
-        </ng-container>
-      </div>
-      
-      <!-- Rank labels (1-8) -->
-      <div class="absolute left-0 top-0 h-full flex flex-col justify-around -ml-6">
-        <ng-container *ngFor="let row of boardRows">
-          <div class="text-center h-16 flex items-center">{{ row + 1 }}</div>
-        </ng-container>
+      <!-- White captured pieces -->
+      <div class="flex flex-wrap justify-center mt-4 h-16 bg-gray-800 rounded-lg p-2 w-full">
+        <div *ngFor="let piece of board.capturedBlackPieces" class="mx-1 captured-piece" [@pieceAnimation]>
+          <img [src]="piece.image" [alt]="piece.type" class="w-8 h-8">
+        </div>
+        <div *ngIf="board.capturedBlackPieces.length === 0" class="text-gray-500 text-sm italic flex items-center">
+          No captured pieces
+        </div>
       </div>
     </div>
   </div>
   
   <!-- Game Info Panel -->
-  <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0">
-    <h2 class="text-2xl font-bold mb-4">Game Info</h2>
+  <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0 flex flex-col shadow-xl game-info">
+    <h2 class="text-2xl font-bold mb-6">Game Info</h2>
     
     <!-- Current Turn -->
-    <div class="mb-6">
-      <p class="text-lg mb-2">Current Turn</p>
-      <div 
-        [class]="'w-6 h-6 rounded-full mr-2 inline-block ' + 
-                (board.currentPlayer === 'white' ? 'bg-white' : 'bg-black')">
+    <div class="mb-6 bg-gray-700 rounded-lg p-4">
+      <p class="text-lg mb-2 text-gray-300">Current Turn</p>
+      <div class="flex items-center">
+        <div 
+          [class]="'w-6 h-6 rounded-full mr-3 ' + 
+                  (board.currentPlayer === 'white' ? 'bg-white' : 'bg-gray-900')">
+        </div>
+        <span class="capitalize text-xl">{{ board.currentPlayer }}</span>
       </div>
-      <span class="capitalize">{{ board.currentPlayer }}</span>
     </div>
     
     <!-- Game Status -->
-    <div class="mb-6">
-      <p *ngIf="board.isCheck" class="text-red-500 font-bold">Check!</p>
-      <p *ngIf="board.isCheckmate" class="text-red-500 font-bold">Checkmate!</p>
-      <p *ngIf="board.isStalemate" class="text-yellow-500 font-bold">Stalemate!</p>
+    <div class="mb-6" *ngIf="board.isCheck || board.isCheckmate || board.isStalemate">
+      <div class="p-3 rounded-lg text-center" 
+           [class.bg-red-900]="board.isCheck || board.isCheckmate"
+           [class.bg-yellow-900]="board.isStalemate">
+        <p *ngIf="board.isCheck && !board.isCheckmate" class="text-red-300 font-bold text-xl">Check!</p>
+        <p *ngIf="board.isCheckmate" class="text-red-300 font-bold text-xl">Checkmate!</p>
+        <p *ngIf="board.isStalemate" class="text-yellow-300 font-bold text-xl">Stalemate!</p>
+      </div>
     </div>
     
     <!-- Move History -->
-    <div class="mb-6">
-      <p class="text-lg mb-2">Move History</p>
-      <div class="bg-gray-700 rounded p-2 h-64 overflow-y-auto">
-        <div *ngIf="board.moveHistory.length === 0" class="text-gray-400">
+    <div class="mb-6 flex-grow">
+      <div class="flex justify-between items-center mb-2">
+        <p class="text-lg text-gray-300">Move History</p>
+        <button 
+          *ngIf="board.moveHistory.length > 0 && !isReplayMode"
+          (click)="startReplay()" 
+          class="text-blue-400 hover:text-blue-300 text-sm flex items-center">
+          <i class="fas fa-play mr-1"></i> Replay
+        </button>
+      </div>
+      
+      <div class="bg-gray-700 rounded p-3 h-64 overflow-y-auto move-history">
+        <div *ngIf="board.moveHistory.length === 0" class="text-gray-500 italic">
           No moves yet
         </div>
-        <div *ngFor="let move of board.moveHistory; let i = index" class="mb-1">
-          <span class="text-gray-400">{{ i + 1 }}.</span> {{ move }}
+        <div class="grid grid-cols-2 gap-2">
+          <ng-container *ngFor="let move of board.moveHistory; let i = index">
+            <div *ngIf="i % 2 === 0" class="mb-1" 
+                 [class.bg-blue-900]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.px-2]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.py-1]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.rounded]="isReplayMode && i === currentReplayMove - 1">
+              <span class="text-gray-400">{{ Math.floor(i/2) + 1 }}.</span> <span class="text-blue-300">{{ move }}</span>
+            </div>
+            <div *ngIf="i % 2 === 1" class="mb-1 text-yellow-200"
+                 [class.bg-blue-900]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.px-2]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.py-1]="isReplayMode && i === currentReplayMove - 1" 
+                 [class.rounded]="isReplayMode && i === currentReplayMove - 1">
+              {{ move }}
+            </div>
+          </ng-container>
         </div>
+      </div>
+      
+      <!-- Replay Controls -->
+      <div *ngIf="isReplayMode" class="flex justify-between items-center mt-2 bg-gray-700 rounded p-2">
+        <button 
+          (click)="prevMove()" 
+          class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
+          [disabled]="currentReplayMove <= 0">
+          <i class="fas fa-step-backward"></i>
+        </button>
+        <span class="text-white">{{ currentReplayMove }} / {{ board.moveHistory.length }}</span>
+        <button 
+          (click)="nextMove()" 
+          class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
+          [disabled]="currentReplayMove >= board.moveHistory.length">
+          <i class="fas fa-step-forward"></i>
+        </button>
+        <button 
+          (click)="isReplayMode = false" 
+          class="bg-red-600 hover:bg-red-500 text-white rounded-lg p-2">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
     </div>
     
     <!-- Buttons -->
-    <div class="flex space-x-2">
+    <div class="flex space-x-2 mt-auto">
       <button 
         (click)="resetGame()" 
-        class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex-1">
-        Reset
+        class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+        <span class="flex items-center justify-center"><i class="fas fa-redo mr-2"></i> Reset</span>
       </button>
       
       <button 
         (click)="returnToMenu()" 
-        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors flex-1">
-        Menu
+        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+        <span class="flex items-center justify-center"><i class="fas fa-home mr-2"></i> Menu</span>
       </button>
+    </div>
+  </div>
+  
+  <!-- Game Over Modal -->
+  <div *ngIf="showGameOverModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-8 rounded-xl shadow-2xl max-w-md w-full mx-4 transform transition-all duration-300 scale-100 opacity-100">
+      <h2 class="text-3xl font-bold mb-4 text-center text-gradient bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Game Over!</h2>
+      
+      <div class="mb-8 text-center">
+        <p class="text-2xl font-bold mb-4">{{ getWinnerText() }}</p>
+        
+        <div class="mt-6 flex justify-center">
+          <div class="bg-gradient-to-r from-yellow-400 to-yellow-600 p-1 rounded-full">
+            <div class="bg-gray-800 p-4 rounded-full">
+              <i *ngIf="board.isCheckmate" class="fas fa-chess-king text-5xl" 
+                 [class.text-white]="board.currentPlayer === 'black'"
+                 [class.text-gray-900]="board.currentPlayer === 'white'"></i>
+              <i *ngIf="board.isStalemate" class="fas fa-handshake text-5xl text-gray-400"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex space-x-4">
+        <button 
+          (click)="startReplay()" 
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg flex items-center justify-center">
+          <i class="fas fa-play mr-2"></i> Replay Game
+        </button>
+        
+        <button 
+          (click)="resetGame()" 
+          class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg flex items-center justify-center">
+          <i class="fas fa-redo mr-2"></i> New Game
+        </button>
+      </div>
     </div>
   </div>
 </div> 

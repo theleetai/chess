@@ -1,4 +1,4 @@
-import { Piece, Position } from './piece.model';
+import { Move, Piece, Position } from './piece.model';
 
 export interface Board {
   squares: (Piece | null)[][];
@@ -11,4 +11,7 @@ export interface Board {
   isStalemate: boolean;
   selectedPiece: Piece | null;
   legalMoves: Position[];
+  capturedWhitePieces: Piece[];
+  capturedBlackPieces: Piece[];
+  lastMove: Move | null;
 } 

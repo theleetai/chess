@@ -1,1 +1,130 @@
-/* Custom styles for chess board (if needed beyond Tailwind) */ 
+/* Custom styles for chess board (if needed beyond Tailwind) */
+
+/* Add smooth transitions for hover effects */
+.chess-piece {
+  transition: all 0.2s ease-in-out;
+}
+
+.chess-piece:hover {
+  transform: scale(1.1);
+  cursor: pointer;
+}
+
+/* Animation for highlighting a square */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0px rgba(255, 255, 0, 0.4); }
+  100% { box-shadow: 0 0 0 10px rgba(255, 255, 0, 0); }
+}
+
+.last-move {
+  animation: pulse 1.5s infinite;
+}
+
+/* Danger indication for threatened pieces */
+.threatened {
+  position: relative;
+}
+
+.threatened::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid rgba(255, 0, 0, 0.6);
+  border-radius: 5px;
+  pointer-events: none;
+}
+
+/* Styling for legal move indicators */
+.legal-move-indicator {
+  width: 33%;
+  height: 33%;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 0, 0.5);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+.legal-capture-indicator {
+  width: 100%;
+  height: 100%;
+  border: 2px solid rgba(255, 255, 0, 0.7);
+  border-radius: 50%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+/* Style for captured pieces */
+.captured-piece {
+  opacity: 0.7;
+  transition: all 0.3s ease;
+}
+
+.captured-piece:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Make the board look 3D */
+.chess-board {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+  border: 4px solid #4a5568;
+}
+
+/* Modern styling for the board squares */
+.square {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.square.light {
+  background-color: #c9b083;
+}
+
+.square.dark {
+  background-color: #769656;
+}
+
+.square.selected {
+  background-color: #bbcb2b;
+}
+
+/* Style for game info panel */
+.game-info {
+  background-color: #2d3748;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Style for move history */
+.move-history {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.move-history::-webkit-scrollbar {
+  width: 6px;
+}
+
+.move-history::-webkit-scrollbar-track {
+  background: #4a5568;
+  border-radius: 3px;
+}
+
+.move-history::-webkit-scrollbar-thumb {
+  background: #718096;
+  border-radius: 3px;
+}
+
+.move-history::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+} 

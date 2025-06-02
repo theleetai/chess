@@ -1,15 +1,83 @@
-<div class="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
-  <div class="bg-gray-800 p-8 rounded-lg w-full max-w-md">
-    <h1 class="text-3xl font-bold mb-6 text-center">Settings</h1>
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white p-6">
+  <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6 card">
+    <h1 class="text-4xl font-bold mb-6 text-center text-gradient bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">Settings</h1>
     
-    <div class="mb-6">
-      <p class="text-gray-400 text-center mb-4">Settings options will be implemented in a future update.</p>
+    <div class="space-y-6 mb-8">
+      <!-- Sound Settings -->
+      <div class="bg-gray-700 p-4 rounded-lg">
+        <h3 class="text-xl font-semibold mb-4 flex items-center">
+          <i class="fas fa-volume-up mr-2"></i> Sound
+        </h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Sound Effects</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600">
+              <div class="absolute left-1 top-1 bg-green-500 w-4 h-4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Background Music</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600">
+              <div class="absolute left-1 top-1 bg-gray-400 w-4 h-4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Visual Settings -->
+      <div class="bg-gray-700 p-4 rounded-lg">
+        <h3 class="text-xl font-semibold mb-4 flex items-center">
+          <i class="fas fa-paint-brush mr-2"></i> Visuals
+        </h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Highlight Legal Moves</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600">
+              <div class="absolute left-7 top-1 bg-green-500 w-4 h-4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Show Threatened Pieces</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600">
+              <div class="absolute left-7 top-1 bg-green-500 w-4 h-4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Gameplay Settings -->
+      <div class="bg-gray-700 p-4 rounded-lg">
+        <h3 class="text-xl font-semibold mb-4 flex items-center">
+          <i class="fas fa-gamepad mr-2"></i> Gameplay
+        </h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Auto-Queen Promotion</label>
+            <div class="relative inline-block w-12 h-6 rounded-full bg-gray-600">
+              <div class="absolute left-7 top-1 bg-green-500 w-4 h-4 rounded-full transition-all duration-300"></div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <label class="text-gray-300">Bot Difficulty</label>
+            <select class="bg-gray-800 text-white px-3 py-1 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option>Easy</option>
+              <option selected>Medium</option>
+              <option>Hard</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <p class="text-gray-400 text-center mb-4 text-sm">
+        Note: These settings are just placeholders and will be implemented in a future update.
+      </p>
     </div>
     
     <div class="flex justify-center">
       <button 
         (click)="goBack()" 
-        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+        class="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg flex items-center justify-center">
+        <i class="fas fa-arrow-left mr-2"></i>
         Back to Main Menu
       </button>
     </div>
