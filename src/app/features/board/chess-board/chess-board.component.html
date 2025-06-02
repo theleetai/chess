@@ -82,7 +82,8 @@
                     [@pieceAnimation]
                     [class.threatened]="isPieceThreatenedBySelected(row, col)"
                     [class.cursor-grab]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode && !showPromotionModal"
-                    [draggable]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode && !showPromotionModal"
+                    [class.opacity-75]="hasVirtualPosition(row, col)"
+                    [draggable]="(board.squares[row][col]?.color === board.currentPlayer || board.squares[row][col]?.color === 'white') && !isReplayMode && !showPromotionModal"
                     (dragstart)="onDragStart($event, row, col)"
                     (dragend)="onDragEnd()">
                     <img 
@@ -96,12 +97,27 @@
                   </div>
                 </ng-container>
                 
+                <!-- Virtual pieces for pre-moves -->
+                <ng-container *ngIf="hasVirtualPieceVisualization(row, col)">
+                  <div 
+                    class="relative w-11/12 h-11/12 chess-piece virtual-piece" 
+                    [@pieceAnimation]
+                    [draggable]="board.currentPlayer !== 'white' && !isReplayMode && !showPromotionModal"
+                    (dragstart)="onDragStart($event, row, col)"
+                    (dragend)="onDragEnd()">
+                    <img 
+                      [src]="getVirtualPieceAt(row, col)?.image" 
+                      [alt]="getVirtualPieceAt(row, col)?.color + ' ' + getVirtualPieceAt(row, col)?.type"
+                      class="w-full h-full object-contain">
+                  </div>
+                </ng-container>
+                
                 <!-- Highlight legal moves -->
                 <div *ngIf="isLegalMove(row, col)" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div *ngIf="!board.squares[row][col]" 
+                  <div *ngIf="!board.squares[row][col] && !hasVirtualPieceAt(row, col)" 
                        class="legal-move-indicator"
                        [@highlightAnimation]></div>
-                  <div *ngIf="board.squares[row][col]" 
+                  <div *ngIf="board.squares[row][col] || hasVirtualPieceAt(row, col)" 
                        class="legal-capture-indicator"
                        [@highlightAnimation]></div>
                 </div>
@@ -152,9 +168,15 @@
              class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse">
           Your turn
         </div>
-        <div *ngIf="preMoveFrom && preMoveTo && board.currentPlayer === 'black'" 
-             class="bg-red-600 px-2 py-1 rounded text-xs">
-          Pre-move set
+        <div *ngIf="preMoveChain.length > 0 && board.currentPlayer === 'black'" 
+             class="bg-red-600 px-2 py-1 rounded text-xs flex items-center">
+          <i class="fas fa-chess-pawn mr-1"></i>
+          <span>{{ preMoveChain.length }} pre-move{{ preMoveChain.length > 1 ? 's' : '' }}</span>
+          <button 
+            (click)="clearPreMoves()" 
+            class="ml-2 bg-red-700 hover:bg-red-800 rounded-full w-4 h-4 flex items-center justify-center">
+            <i class="fas fa-times text-[9px]"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -257,25 +279,65 @@
       </div>
       
       <!-- Replay Controls -->
-      <div *ngIf="isReplayMode" class="flex justify-between items-center mt-2 bg-gray-700 rounded p-2">
-        <button 
-          (click)="prevMove()" 
-          class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
-          [disabled]="currentReplayMove <= 0">
-          <i class="fas fa-step-backward"></i>
-        </button>
-        <span class="text-white">{{ currentReplayMove }} / {{ getTotalMoves() }}</span>
-        <button 
-          (click)="nextMove()" 
-          class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
-          [disabled]="currentReplayMove >= getTotalMoves()">
-          <i class="fas fa-step-forward"></i>
-        </button>
-        <button 
-          (click)="exitReplayMode()" 
-          class="bg-red-600 hover:bg-red-500 text-white rounded-lg p-2">
-          <i class="fas fa-times"></i>
-        </button>
+      <div *ngIf="isReplayMode" class="flex flex-col space-y-2">
+        <!-- Move Quality Display -->
+        <div *ngIf="currentReplayMove > 0 && moveQuality" class="mb-2 p-3 rounded-lg text-center">
+          <div class="flex items-center justify-center">
+            <span *ngIf="isAnalyzing" class="text-gray-400 animate-pulse">Analyzing move...</span>
+            <div *ngIf="!isAnalyzing" class="text-lg font-bold" [class]="getMoveQualityClass()">
+              <span *ngIf="moveQuality === 'brilliant'" class="flex items-center">
+                <i class="fas fa-gem mr-2"></i> Brilliant!
+              </span>
+              <span *ngIf="moveQuality === 'best'" class="flex items-center">
+                <i class="fas fa-medal mr-2"></i> Best Move
+              </span>
+              <span *ngIf="moveQuality === 'excellent'" class="flex items-center">
+                <i class="fas fa-star mr-2"></i> Excellent
+              </span>
+              <span *ngIf="moveQuality === 'good'" class="flex items-center">
+                <i class="fas fa-thumbs-up mr-2"></i> Good
+              </span>
+              <span *ngIf="moveQuality === 'okay'" class="flex items-center">
+                <i class="fas fa-check mr-2"></i> Okay
+              </span>
+              <span *ngIf="moveQuality === 'book'" class="flex items-center">
+                <i class="fas fa-book mr-2"></i> Book Move
+              </span>
+              <span *ngIf="moveQuality === 'inaccuracy'" class="flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i> Inaccuracy
+              </span>
+              <span *ngIf="moveQuality === 'mistake'" class="flex items-center">
+                <i class="fas fa-times-circle mr-2"></i> Mistake
+              </span>
+              <span *ngIf="moveQuality === 'blunder'" class="flex items-center">
+                <i class="fas fa-skull mr-2"></i> Blunder
+              </span>
+            </div>
+          </div>
+          <p *ngIf="!isAnalyzing" class="mt-2 text-sm text-gray-300">{{moveQualityMessage}}</p>
+        </div>
+
+        <!-- Replay Controls -->
+        <div class="flex justify-between items-center bg-gray-700 rounded p-2">
+          <button 
+            (click)="prevMove()" 
+            class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
+            [disabled]="currentReplayMove <= 0">
+            <i class="fas fa-step-backward"></i>
+          </button>
+          <span class="text-white">{{ currentReplayMove }} / {{ getTotalMoves() }}</span>
+          <button 
+            (click)="nextMove()" 
+            class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
+            [disabled]="currentReplayMove >= getTotalMoves()">
+            <i class="fas fa-step-forward"></i>
+          </button>
+          <button 
+            (click)="exitReplayMode()" 
+            class="bg-red-600 hover:bg-red-500 text-white rounded-lg p-2">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
       </div>
     </div>
     
