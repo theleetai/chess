@@ -163,9 +163,6 @@ export class GameService {
     // Check for game state (check, checkmate, stalemate)
     this.updateGameState();
 
-    // Save current state to history for replay
-    this.gameHistory.push(this.createBoardCopy(this.boardState()));
-
     return true;
   }
 
@@ -291,6 +288,9 @@ export class GameService {
         blackQueensideRookMoved
       };
     });
+    
+    // Save current state to history for replay
+    this.gameHistory.push(this.createBoardCopy(this.boardState()));
   }
 
   // Create a deep copy of a board state
@@ -859,9 +859,6 @@ export class GameService {
     
     // Check for game state (check, checkmate, stalemate)
     this.updateGameState();
-
-    // Save current state to history for replay
-    this.gameHistory.push(this.createBoardCopy(this.boardState()));
 
     return true;
   }

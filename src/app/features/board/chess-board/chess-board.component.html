@@ -67,6 +67,10 @@
                            board.selectedPiece.position.row === row && 
                            board.selectedPiece.position.col === col"
                 [class.last-move]="isLastMove(row, col)"
+                [class.hint-from]="isHintMove(row, col) && !isHintDestination(row, col)"
+                [class.hint-to]="isHintDestination(row, col)"
+                [class.pre-move-from]="isPreMove(row, col) && !isPreMoveDestination(row, col)"
+                [class.pre-move-to]="isPreMoveDestination(row, col)"
                 (click)="onSquareClick(row, col)"
                 (dragover)="onDragOver($event, row, col)"
                 (drop)="onDrop($event, row, col)">
@@ -147,6 +151,10 @@
         <div *ngIf="board.currentPlayer === 'white'" 
              class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse">
           Your turn
+        </div>
+        <div *ngIf="preMoveFrom && preMoveTo && board.currentPlayer === 'black'" 
+             class="bg-red-600 px-2 py-1 rounded text-xs">
+          Pre-move set
         </div>
       </div>
     </div>
@@ -256,11 +264,11 @@
           [disabled]="currentReplayMove <= 0">
           <i class="fas fa-step-backward"></i>
         </button>
-        <span class="text-white">{{ currentReplayMove }} / {{ board.moveHistory.length }}</span>
+        <span class="text-white">{{ currentReplayMove }} / {{ getTotalMoves() }}</span>
         <button 
           (click)="nextMove()" 
           class="bg-gray-600 hover:bg-gray-500 text-white rounded-lg p-2"
-          [disabled]="currentReplayMove >= board.moveHistory.length">
+          [disabled]="currentReplayMove >= getTotalMoves()">
           <i class="fas fa-step-forward"></i>
         </button>
         <button 
@@ -367,21 +375,18 @@
     </div>
   </div>
   
-  <!-- Hint Modal -->
+  <!-- Simplified Hint Modal (only shown when no valid hint is available) -->
   <div *ngIf="showHintModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
     <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
       <h2 class="text-2xl font-bold mb-4 text-center text-blue-400">Hint</h2>
       
       <div class="mb-6 text-center">
         <p>{{ hintMessage }}</p>
-        <div *ngIf="hintMove" class="mt-4 bg-gray-700 p-3 rounded-lg inline-block">
-          <span class="font-mono">{{ formatHintMove() }}</span>
-        </div>
       </div>
       
       <div class="flex justify-center">
         <button 
-          (click)="closeHint()" 
+          (click)="showHintModal = false" 
           class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg">
           Got it
         </button>

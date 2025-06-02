@@ -84,7 +84,12 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   // Hint variables
   showHintModal = false;
   hintMessage = '';
-  hintMove: {from: Position, to: Position} | null = null;
+  hintMove: {from: Position, to: Position, piece: Piece} | null = null;
+  showHintOnBoard = false;
+  
+  // Pre-move variables
+  preMoveFrom: Position | null = null;
+  preMoveTo: Position | null = null;
   
   // Evaluation bar
   evaluationScore = 0;
@@ -149,6 +154,12 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   private setupBotMoves(): void {
     // Watch for changes in the current player
     const checkBotTurn = () => {
+      // Check if a pre-move should be executed
+      if (this.board.currentPlayer === 'white' && this.preMoveFrom && this.preMoveTo) {
+        this.executePreMoveIfValid();
+        return; // Don't proceed with bot move yet
+      }
+      
       if (this.board.currentPlayer === 'black' && !this.isReplayMode && !this.showPromotionModal) {
         this.botService.makeBotMove();
       }
@@ -239,13 +250,34 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       });
   }
   
-  // Handle square click
+  // Handle square click with pre-move support
   onSquareClick(row: number, col: number): void {
     if (this.isReplayMode) return; // Disable clicks in replay mode
     if (this.showPromotionModal) return; // Disable clicks during promotion
     
     const board = this.board;
     const piece = board.squares[row][col];
+    
+    // If it's not the player's turn, handle pre-move
+    if (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsPlayer()) {
+      // If it's not the player's turn and they click their own piece, start a pre-move
+      if (board.currentPlayer !== 'white' && piece && piece.color === 'white') {
+        this.startPreMove(row, col);
+        return;
+      }
+      
+      // If a pre-move is already in progress and they click on a destination
+      if (this.preMoveFrom && this.board.currentPlayer !== 'white') {
+        this.setPreMoveDestination(row, col);
+        return;
+      }
+      
+      // Cancel pre-move if clicking elsewhere and a pre-move is in progress
+      if (this.preMoveFrom && this.board.currentPlayer !== 'white') {
+        this.cancelPreMove();
+        return;
+      }
+    }
     
     // If a piece is already selected, try to move it
     if (board.selectedPiece) {
@@ -274,6 +306,8 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       // If move was successful, track it for animation
       if (moveSuccessful) {
         this.trackLastMove();
+        // Hide hint after move is made
+        this.showHintOnBoard = false;
       }
       // If move failed and clicked on another piece of same color, select that piece
       else if (piece && piece.color === board.currentPlayer) {
@@ -399,25 +433,35 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // Start replay mode
   startReplay(): void {
-    this.isReplayMode = true;
-    this.currentReplayMove = 0;
+    // Make sure we have the complete game history
+    const gameState = this.gameService.getCurrentGameState();
+    if (gameState.history.length <= 1) {
+      console.error('No game history available for replay');
+      return;
+    }
     
-    // Set the board to the initial state
-    this.gameService.setReplayState(0);
+    this.isReplayMode = true;
+    
+    // Start from move 0 (initial state)
+    this.currentReplayMove = 0;
+    this.gameService.setReplayState(this.currentReplayMove);
     
     // Hide game over modal if it was shown
     this.showGameOverModal = false;
     
-    // Clear move evaluation
+    // Clear move evaluation and other visual indicators
     this.currentMoveEvaluation = '';
+    this.showHintOnBoard = false;
+    this.cancelPreMove();
   }
   
   // Exit replay mode
   exitReplayMode(): void {
     this.isReplayMode = false;
     
-    // Return to current game state
-    this.gameService.setReplayState(this.gameService.getCurrentGameState().history.length - 1);
+    // Return to current game state (last move in history)
+    const gameState = this.gameService.getCurrentGameState();
+    this.gameService.setReplayState(gameState.history.length - 1);
     
     // If game was over, show the game over modal again
     if (this.board.isCheckmate || this.board.isStalemate || this.resignedPlayer) {
@@ -429,7 +473,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   nextMove(): void {
     if (!this.isReplayMode) return;
     
-    // Calculate the max move index
+    // Calculate the max move index (number of moves in history - 1)
     const maxMoveIndex = this.gameService.getCurrentGameState().history.length - 1;
     
     if (this.currentReplayMove < maxMoveIndex) {
@@ -437,12 +481,10 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       this.gameService.setReplayState(this.currentReplayMove);
       
       // Highlight the last move
-      if (this.currentReplayMove > 0) {
-        const lastMove = this.board.lastMove;
-        if (lastMove) {
-          this.lastMovedFrom = lastMove.from;
-          this.lastMovedTo = lastMove.to;
-        }
+      const board = this.gameService.board();
+      if (board.lastMove) {
+        this.lastMovedFrom = board.lastMove.from;
+        this.lastMovedTo = board.lastMove.to;
       }
     }
   }
@@ -454,21 +496,19 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     this.gameService.setReplayState(this.currentReplayMove);
     
     // Update last move highlight
-    if (this.currentReplayMove > 0) {
-      const state = this.gameService.getCurrentGameState();
-      const board = state.history[this.currentReplayMove];
-      
-      if (board.lastMove) {
-        this.lastMovedFrom = board.lastMove.from;
-        this.lastMovedTo = board.lastMove.to;
-      } else {
-        this.lastMovedFrom = null;
-        this.lastMovedTo = null;
-      }
+    const board = this.gameService.board();
+    if (this.currentReplayMove > 0 && board.lastMove) {
+      this.lastMovedFrom = board.lastMove.from;
+      this.lastMovedTo = board.lastMove.to;
     } else {
       this.lastMovedFrom = null;
       this.lastMovedTo = null;
     }
+  }
+  
+  // Get the total number of moves in the game history
+  getTotalMoves(): number {
+    return this.gameService.getCurrentGameState().history.length - 1;
   }
   
   // Handle drag start event
@@ -479,13 +519,21 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     }
     
     const piece = this.board.squares[row][col];
-    if (!piece || piece.color !== this.board.currentPlayer) {
+    
+    // Allow dragging own pieces even when it's not your turn (for pre-moves)
+    if (!piece || (piece.color !== this.board.currentPlayer && piece.color !== 'white')) {
       event.preventDefault();
       return;
     }
     
-    this.draggedPiece = piece;
-    this.gameService.selectPiece(row, col);
+    // If it's not player's turn, start a pre-move
+    if (piece.color !== this.board.currentPlayer) {
+      this.preMoveFrom = { row, col };
+      this.preMoveTo = null;
+    } else {
+      this.draggedPiece = piece;
+      this.gameService.selectPiece(row, col);
+    }
     
     // Set data to transfer
     if (event.dataTransfer) {
@@ -496,13 +544,22 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // Handle drag over event
   onDragOver(event: DragEvent, row: number, col: number): void {
-    if (this.isReplayMode || !this.draggedPiece || this.showPromotionModal) {
+    if (this.isReplayMode || this.showPromotionModal) {
       return; // Don't prevent default to disallow drop
     }
     
-    // Check if this is a legal move
-    if (this.isLegalMove(row, col)) {
-      event.preventDefault(); // Allow the drop
+    // For normal moves
+    if (this.draggedPiece) {
+      // Check if this is a legal move
+      if (this.isLegalMove(row, col)) {
+        event.preventDefault(); // Allow the drop
+      }
+      return;
+    }
+    
+    // For pre-moves
+    if (this.preMoveFrom) {
+      event.preventDefault(); // Always allow pre-move drops
     }
   }
   
@@ -510,7 +567,16 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   onDrop(event: DragEvent, row: number, col: number): void {
     event.preventDefault();
     
-    if (this.isReplayMode || !this.draggedPiece || this.showPromotionModal) return;
+    if (this.isReplayMode || this.showPromotionModal) return;
+    
+    // Handle pre-moves
+    if (this.preMoveFrom && !this.draggedPiece) {
+      this.preMoveTo = { row, col };
+      return;
+    }
+    
+    // Handle normal moves
+    if (!this.draggedPiece) return;
     
     // Check for pawn promotion
     if (this.isPawnPromotion(this.draggedPiece, { row, col })) {
@@ -529,6 +595,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       
       if (moveSuccessful) {
         this.trackLastMove();
+        this.showHintOnBoard = false;
       }
     }
     
@@ -537,9 +604,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // End drag
   onDragEnd(): void {
-    if (!this.isReplayMode && this.draggedPiece) {
-      this.draggedPiece = null;
-    }
+    this.draggedPiece = null;
   }
   
   // Confirm resignation
@@ -582,11 +647,6 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   showHint(): void {
     if (this.isReplayMode) return;
     
-    // Show loading state
-    this.hintMessage = 'Calculating best move...';
-    this.hintMove = null;
-    this.showHintModal = true;
-    
     // Get a hint from the chess engine
     this.engineService.getBestMove(this.board, this.board.currentPlayer)
       .subscribe({
@@ -594,21 +654,23 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
           if (result.success && result.bestMove) {
             this.hintMove = result.bestMove;
             this.hintMessage = `Consider moving your ${result.bestMove.piece.type} from ${this.formatPosition(result.bestMove.from)} to ${this.formatPosition(result.bestMove.to)}.`;
+            this.showHintOnBoard = true;
           } else {
             this.hintMessage = result.error || 'No good moves available at the moment.';
+            this.showHintModal = true;
           }
         },
         error: (error) => {
           console.error('Error getting hint:', error);
           this.hintMessage = 'Error calculating best move. Please try again.';
+          this.showHintModal = true;
         }
       });
   }
   
-  // Close the hint modal
-  closeHint(): void {
-    this.showHintModal = false;
-    this.hintMove = null;
+  // Toggle hint visibility
+  toggleHint(): void {
+    this.showHintOnBoard = !this.showHintOnBoard;
   }
   
   // Format a position (e.g., e4)
@@ -787,5 +849,109 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     
     this.persistenceService.saveGame(this.gameName);
     this.showSaveGameModal = false;
+  }
+
+  // Start a pre-move
+  startPreMove(row: number, col: number): void {
+    const piece = this.board.squares[row][col];
+    if (!piece || piece.color !== 'white') return;
+    
+    this.preMoveFrom = { row, col };
+    this.preMoveTo = null;
+  }
+  
+  // Set the destination for a pre-move
+  setPreMoveDestination(row: number, col: number): void {
+    if (!this.preMoveFrom) return;
+    
+    this.preMoveTo = { row, col };
+  }
+  
+  // Cancel a pre-move
+  cancelPreMove(): void {
+    this.preMoveFrom = null;
+    this.preMoveTo = null;
+  }
+  
+  // Execute a pre-move if valid
+  executePreMoveIfValid(): void {
+    if (!this.preMoveFrom || !this.preMoveTo) return;
+    
+    // Check if it's now the player's turn
+    if (this.board.currentPlayer !== 'white') return;
+    
+    const fromRow = this.preMoveFrom.row;
+    const fromCol = this.preMoveFrom.col;
+    const toRow = this.preMoveTo.row;
+    const toCol = this.preMoveTo.col;
+    
+    const piece = this.board.squares[fromRow][fromCol];
+    
+    // Verify the piece still exists and is the right color
+    if (!piece || piece.color !== 'white') {
+      this.cancelPreMove();
+      return;
+    }
+    
+    // Select the piece and check if the move is legal
+    this.gameService.selectPiece(fromRow, fromCol);
+    
+    // Check if the move is legal
+    const isLegalMove = this.board.legalMoves.some(
+      move => move.row === toRow && move.col === toCol
+    );
+    
+    if (isLegalMove) {
+      // Execute the move
+      if (this.isPawnPromotion(piece, { row: toRow, col: toCol })) {
+        // For simplicity, auto-promote to queen
+        this.gameService.movePieceWithPromotion(
+          { row: fromRow, col: fromCol },
+          { row: toRow, col: toCol },
+          'queen'
+        );
+      } else {
+        this.gameService.movePiece(toRow, toCol);
+      }
+      
+      this.trackLastMove();
+    }
+    
+    // Clear the pre-move
+    this.cancelPreMove();
+  }
+
+  // Add method to check if a position is part of the hint
+  isHintMove(row: number, col: number): boolean {
+    if (!this.showHintOnBoard || !this.hintMove) return false;
+    
+    return (
+      (this.hintMove.from.row === row && this.hintMove.from.col === col) ||
+      (this.hintMove.to.row === row && this.hintMove.to.col === col)
+    );
+  }
+  
+  // Check if a position is the destination of a hint
+  isHintDestination(row: number, col: number): boolean {
+    if (!this.showHintOnBoard || !this.hintMove) return false;
+    
+    return (this.hintMove.to.row === row && this.hintMove.to.col === col);
+  }
+  
+  // Check if a position is part of a pre-move
+  isPreMove(row: number, col: number): boolean {
+    if (!this.preMoveFrom || !this.preMoveTo) return false;
+    
+    return (
+      (this.preMoveFrom.row === row && this.preMoveFrom.col === col) ||
+      (this.preMoveTo.row === row && this.preMoveTo.col === col)
+    );
+  }
+  
+  // Check if a position is the destination of a pre-move
+  isPreMoveDestination(row: number, col: number): boolean {
+    if (!this.preMoveFrom || !this.preMoveTo) return false;
+    
+    return (this.preMoveTo.row === row && this.preMoveTo.col === col);
   }
 } 
