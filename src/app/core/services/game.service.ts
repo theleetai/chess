@@ -21,7 +21,13 @@ export class GameService {
     legalMoves: [],
     capturedWhitePieces: [],
     capturedBlackPieces: [],
-    lastMove: null
+    lastMove: null,
+    whiteKingMoved: false,
+    blackKingMoved: false,
+    whiteKingsideRookMoved: false,
+    whiteQueensideRookMoved: false,
+    blackKingsideRookMoved: false,
+    blackQueensideRookMoved: false
   });
 
   // Store the full game history for replay
@@ -225,11 +231,40 @@ export class GameService {
       let whiteKingPosition = state.whiteKingPosition;
       let blackKingPosition = state.blackKingPosition;
       
+      // Update castling flags
+      let whiteKingMoved = state.whiteKingMoved;
+      let blackKingMoved = state.blackKingMoved;
+      let whiteKingsideRookMoved = state.whiteKingsideRookMoved;
+      let whiteQueensideRookMoved = state.whiteQueensideRookMoved;
+      let blackKingsideRookMoved = state.blackKingsideRookMoved;
+      let blackQueensideRookMoved = state.blackQueensideRookMoved;
+      
+      // Check if king moved
       if (piece.type === 'king') {
         if (piece.color === 'white') {
           whiteKingPosition = { ...to };
+          whiteKingMoved = true;
         } else {
           blackKingPosition = { ...to };
+          blackKingMoved = true;
+        }
+      }
+      
+      // Check if rook moved
+      if (piece.type === 'rook') {
+        const { row, col } = from;
+        if (piece.color === 'white') {
+          if (row === 0 && col === 0) {
+            whiteQueensideRookMoved = true;
+          } else if (row === 0 && col === 7) {
+            whiteKingsideRookMoved = true;
+          }
+        } else {
+          if (row === 7 && col === 0) {
+            blackQueensideRookMoved = true;
+          } else if (row === 7 && col === 7) {
+            blackKingsideRookMoved = true;
+          }
         }
       }
 
@@ -247,7 +282,13 @@ export class GameService {
         legalMoves: [],
         capturedWhitePieces,
         capturedBlackPieces,
-        lastMove: move
+        lastMove: move,
+        whiteKingMoved,
+        blackKingMoved,
+        whiteKingsideRookMoved,
+        whiteQueensideRookMoved,
+        blackKingsideRookMoved,
+        blackQueensideRookMoved
       };
     });
   }
@@ -278,7 +319,13 @@ export class GameService {
       legalMoves: [], // Don't copy legal moves
       capturedWhitePieces: capturedWhitePiecesCopy,
       capturedBlackPieces: capturedBlackPiecesCopy,
-      lastMove: board.lastMove ? { ...board.lastMove } : null
+      lastMove: board.lastMove ? { ...board.lastMove } : null,
+      whiteKingMoved: board.whiteKingMoved,
+      blackKingMoved: board.blackKingMoved,
+      whiteKingsideRookMoved: board.whiteKingsideRookMoved,
+      whiteQueensideRookMoved: board.whiteQueensideRookMoved,
+      blackKingsideRookMoved: board.blackKingsideRookMoved,
+      blackQueensideRookMoved: board.blackQueensideRookMoved
     };
   }
 
@@ -728,7 +775,13 @@ export class GameService {
       legalMoves: [],
       capturedWhitePieces: [],
       capturedBlackPieces: [],
-      lastMove: null
+      lastMove: null,
+      whiteKingMoved: false,
+      blackKingMoved: false,
+      whiteKingsideRookMoved: false,
+      whiteQueensideRookMoved: false,
+      blackKingsideRookMoved: false,
+      blackQueensideRookMoved: false
     });
     
     // Reset game history
@@ -752,5 +805,80 @@ export class GameService {
     
     const historyState = this.gameHistory[moveIndex];
     this.boardState.set(this.createBoardCopy(historyState));
+  }
+
+  // Get winner text
+  getWinnerText(): string {
+    const currentBoard = this.boardState();
+    if (currentBoard.isCheckmate) {
+      const winner = currentBoard.currentPlayer === 'white' ? 'Black' : 'White';
+      return `${winner} wins by checkmate!`;
+    } else if (currentBoard.isStalemate) {
+      return "Game drawn by stalemate!";
+    }
+    return "";
+  }
+  
+  // Move a piece with explicit promotion choice
+  movePieceWithPromotion(from: Position, to: Position, promotionPiece: PieceType): boolean {
+    const board = this.boardState();
+    const piece = board.squares[from.row][from.col];
+
+    if (!piece) return false;
+
+    // Check if move is legal
+    this.selectPiece(from.row, from.col);
+    const isLegalMove = board.legalMoves.some(
+      move => move.row === to.row && move.col === to.col
+    );
+
+    if (!isLegalMove) {
+      this.clearSelection();
+      return false;
+    }
+
+    // Create a move object
+    const move: Move = {
+      from,
+      to,
+      piece: { ...piece }
+    };
+
+    // Check for captured piece
+    const capturedPiece = board.squares[to.row][to.col];
+    if (capturedPiece) {
+      move.capturedPiece = { ...capturedPiece };
+    }
+
+    // Set promotion data
+    move.isPromotion = true;
+    move.promotionPiece = promotionPiece;
+
+    // Execute the move
+    this.executeMove(move);
+    
+    // Check for game state (check, checkmate, stalemate)
+    this.updateGameState();
+
+    // Save current state to history for replay
+    this.gameHistory.push(this.createBoardCopy(this.boardState()));
+
+    return true;
+  }
+
+  // Undo the last move
+  undoMove(): boolean {
+    if (this.gameHistory.length <= 1) {
+      return false; // Can't undo the initial state
+    }
+
+    // Remove the last state from history
+    this.gameHistory.pop();
+    
+    // Set the current state to the previous one
+    const previousState = this.gameHistory[this.gameHistory.length - 1];
+    this.boardState.set(this.createBoardCopy(previousState));
+    
+    return true;
   }
 } 

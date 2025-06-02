@@ -1,59 +1,63 @@
-# ChessGame
+# Chess Game
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.11.
+A modern chess game built with Angular 19 and TailwindCSS.
 
-## Development server
+## Features
 
-To start a local development server, run:
+### Core Chess Logic
+- Complete implementation of chess rules
+- Legal move validation
+- Check and checkmate detection
+- Stalemate detection
+- Algebraic notation for moves
+- Drag and drop support for pieces
 
-```bash
-ng serve
+### Advanced Chess Features
+- **Pawn Promotion**: When a pawn reaches the other side, a modal appears with options to promote to Queen, Rook, Bishop, or Knight
+- **Piece Threats**: Pieces are highlighted in red when threatened by the currently selected piece
+- **Game History**: Full move history with the ability to replay the game
+- **Evaluation Bar**: Simple evaluation bar showing the current advantage
+- **Game Controls**: Options to resign, undo moves, or get hints
+- **Player Avatars**: Visual representation of players and bot
+
+### Game Modes
+- Player vs Player
+- Player vs Bot
+- Player vs AI (coming soon)
+
+## Technical Implementation
+
+The game is built using a well-structured, component-based architecture:
+
+### Core Services
+- **GameService**: Manages the chess board state, move validation, and game logic
+- **BotService**: Implements AI for computer opponent
+- **GameStateService**: Tracks game mode and state
+
+### Key Components
+- **ChessBoardComponent**: Main board UI and interaction logic
+- **MainMenuComponent**: Game entry point with mode selection
+- **SettingsComponent**: Game configuration options
+
+### Models
+- **Board**: Represents the game state
+- **Piece**: Represents chess pieces with their properties
+- **Position**: Coordinates on the board
+- **Move**: Represents a chess move with source, destination, and special properties
+
+## Getting Started
+
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Run the development server with `npm run dev`
+4. Open your browser to `http://localhost:4200`
+
+## Avatar Images
+
+The game uses avatar images for players and the bot. You can generate these by running:
+
+```
+node src/download-avatars.js
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+This will download placeholder avatars from the UI Avatars API.

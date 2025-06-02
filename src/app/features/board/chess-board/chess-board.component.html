@@ -1,6 +1,46 @@
 <div class="flex flex-col md:flex-row min-h-screen bg-gray-900 text-white p-4">
+  <!-- Evaluation Bar -->
+  <div class="hidden md:flex flex-col items-center mr-4 w-6 h-96 self-center">
+    <div class="h-full w-full bg-gray-700 rounded-full overflow-hidden relative">
+      <div 
+        [style.height.%]="50 + (evaluationScore * 5)" 
+        class="bg-gradient-to-b from-white to-gray-300 transition-all duration-300"
+        [class.from-white]="evaluationScore >= 0"
+        [class.to-gray-300]="evaluationScore >= 0"
+        [class.from-gray-900]="evaluationScore < 0"
+        [class.to-black]="evaluationScore < 0">
+      </div>
+      <div class="absolute top-1/2 left-0 w-full border-t border-gray-500"></div>
+    </div>
+    <div class="text-xs mt-2 font-mono" [class.text-green-400]="evaluationScore > 0" [class.text-red-400]="evaluationScore < 0">
+      {{evaluationScore > 0 ? '+' : ''}}{{evaluationScore.toFixed(1)}}
+    </div>
+  </div>
+
   <!-- Chess Board Section -->
   <div class="flex-1 flex flex-col items-center justify-center space-y-8">
+    <!-- Player Info - Top (Black) -->
+    <div class="flex items-center bg-gray-800 rounded-lg p-2 w-full">
+      <div class="flex items-center">
+        <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-700 mr-3">
+          <img 
+            [src]="gameStateService.isPlayerVsBot() ? 'assets/bot-avatar.png' : 'assets/player2-avatar.png'" 
+            alt="Player 2" 
+            class="w-full h-full object-cover">
+        </div>
+        <div>
+          <div class="font-bold">{{gameStateService.isPlayerVsBot() ? 'Bot' : 'Player 2'}}</div>
+          <div class="text-xs text-gray-400">Black</div>
+        </div>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <div *ngIf="board.currentPlayer === 'black'" 
+             class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse">
+          Thinking...
+        </div>
+      </div>
+    </div>
+
     <!-- Board with captured pieces above/below -->
     <div class="flex flex-col items-center">
       <!-- Black captured pieces -->
@@ -35,9 +75,9 @@
                   <div 
                     class="relative w-11/12 h-11/12 chess-piece" 
                     [@pieceAnimation]
-                    [class.threatened]="isUnderThreat(row, col)"
-                    [class.cursor-grab]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode"
-                    [draggable]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode"
+                    [class.threatened]="isPieceThreatenedBySelected(row, col)"
+                    [class.cursor-grab]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode && !showPromotionModal"
+                    [draggable]="board.squares[row][col]?.color === board.currentPlayer && !isReplayMode && !showPromotionModal"
                     (dragstart)="onDragStart($event, row, col)"
                     (dragend)="onDragEnd()">
                     <img 
@@ -90,6 +130,47 @@
         </div>
       </div>
     </div>
+
+    <!-- Player Info - Bottom (White) -->
+    <div class="flex items-center bg-gray-800 rounded-lg p-2 w-full">
+      <div class="flex items-center">
+        <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-700 mr-3">
+          <img src="assets/player1-avatar.png" alt="Player 1" class="w-full h-full object-cover">
+        </div>
+        <div>
+          <div class="font-bold">Player 1</div>
+          <div class="text-xs text-gray-400">White</div>
+        </div>
+      </div>
+      <div class="ml-auto flex gap-2">
+        <div *ngIf="board.currentPlayer === 'white'" 
+             class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse">
+          Your turn
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Control Buttons -->
+    <div class="flex justify-center space-x-4 mt-4 w-full">
+      <button 
+        (click)="showHint()" 
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+        [disabled]="isReplayMode">
+        <i class="fas fa-lightbulb mr-2"></i> Hint
+      </button>
+      <button 
+        (click)="undoMove()" 
+        class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg flex items-center"
+        [disabled]="isReplayMode || board.moveHistory.length === 0">
+        <i class="fas fa-undo mr-2"></i> Undo
+      </button>
+      <button 
+        (click)="confirmResign()" 
+        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center"
+        [disabled]="isReplayMode || board.isCheckmate || board.isStalemate">
+        <i class="fas fa-flag mr-2"></i> Resign
+      </button>
+    </div>
   </div>
   
   <!-- Game Info Panel -->
@@ -124,7 +205,7 @@
       <div class="flex justify-between items-center mb-2">
         <p class="text-lg text-gray-300">Move History</p>
         <button 
-          *ngIf="board.moveHistory.length > 0 && !isReplayMode"
+          *ngIf="board.moveHistory.length > 0 && !isReplayMode && !board.isCheckmate && !board.isStalemate"
           (click)="startReplay()" 
           class="text-blue-400 hover:text-blue-300 text-sm flex items-center">
           <i class="fas fa-play mr-1"></i> Replay
@@ -171,7 +252,7 @@
           <i class="fas fa-step-forward"></i>
         </button>
         <button 
-          (click)="isReplayMode = false" 
+          (click)="exitReplayMode()" 
           class="bg-red-600 hover:bg-red-500 text-white rounded-lg p-2">
           <i class="fas fa-times"></i>
         </button>
@@ -209,6 +290,7 @@
                  [class.text-white]="board.currentPlayer === 'black'"
                  [class.text-gray-900]="board.currentPlayer === 'white'"></i>
               <i *ngIf="board.isStalemate" class="fas fa-handshake text-5xl text-gray-400"></i>
+              <i *ngIf="resignedPlayer" class="fas fa-flag text-5xl text-red-500"></i>
             </div>
           </div>
         </div>
@@ -225,6 +307,71 @@
           (click)="resetGame()" 
           class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg flex items-center justify-center">
           <i class="fas fa-redo mr-2"></i> New Game
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Pawn Promotion Modal -->
+  <div *ngIf="showPromotionModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4 text-center">Promote Pawn</h2>
+      <p class="text-center mb-6 text-gray-300">Choose a piece to promote your pawn to:</p>
+      
+      <div class="grid grid-cols-4 gap-4">
+        <button 
+          *ngFor="let option of promotionOptions" 
+          (click)="selectPromotion(option)"
+          class="bg-gray-700 hover:bg-gray-600 p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200 hover:scale-105">
+          <img 
+            [src]="getPromotionImage(option)" 
+            [alt]="option" 
+            class="w-16 h-16 object-contain mb-2">
+          <span class="text-sm font-semibold">{{ option | titlecase }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Resign Confirmation Modal -->
+  <div *ngIf="showResignModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4 text-center text-red-500">Resign Game</h2>
+      <p class="text-center mb-6">Are you sure you want to resign this game?</p>
+      
+      <div class="flex space-x-4">
+        <button 
+          (click)="resign()" 
+          class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+          Yes, Resign
+        </button>
+        
+        <button 
+          (click)="showResignModal = false" 
+          class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex-1 shadow-md hover:shadow-lg">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Hint Modal -->
+  <div *ngIf="showHintModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-md w-full mx-4">
+      <h2 class="text-2xl font-bold mb-4 text-center text-blue-400">Hint</h2>
+      
+      <div class="mb-6 text-center">
+        <p>{{ hintMessage }}</p>
+        <div *ngIf="hintMove" class="mt-4 bg-gray-700 p-3 rounded-lg inline-block">
+          <span class="font-mono">{{ formatHintMove() }}</span>
+        </div>
+      </div>
+      
+      <div class="flex justify-center">
+        <button 
+          (click)="closeHint()" 
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md hover:shadow-lg">
+          Got it
         </button>
       </div>
     </div>

@@ -14,4 +14,12 @@ export interface Board {
   capturedWhitePieces: Piece[];
   capturedBlackPieces: Piece[];
   lastMove: Move | null;
+  
+  // Castling availability flags
+  whiteKingMoved: boolean;
+  blackKingMoved: boolean;
+  whiteKingsideRookMoved: boolean;
+  whiteQueensideRookMoved: boolean;
+  blackKingsideRookMoved: boolean;
+  blackQueensideRookMoved: boolean;
 } 
