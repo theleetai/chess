@@ -9,17 +9,9 @@ import { GameStateService } from '../../../core/services/game-state.service';
 import { ChessEngineService, EngineResult, MoveQuality, StockfishResponse } from '../../../core/services/chess-engine.service';
 import { GamePersistenceService } from '../../../core/services/game-persistence.service';
 import { Piece, Position, PieceType, PieceColor, Move } from '../../../core/models/piece.model';
+import { PreMoveService, PreMove } from '../../../core/services/pre-move.service';
 import { Subscription, interval, Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-
-// Add this interface at the top of the file, after other imports
-interface PreMove {
-  id: string;           // Unique identifier for this pre-move
-  pieceId: string;      // Original piece identifier (row,col)
-  from: Position;       // Starting position (could be virtual)
-  to: Position;         // Target position
-  originalPosition: Position; // Original board position of the piece
-}
 
 @Component({
   selector: 'app-chess-board',
@@ -55,6 +47,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private engineService = inject(ChessEngineService);
   private persistenceService = inject(GamePersistenceService);
+  protected preMoveService = inject(PreMoveService);
   
   private botMoveSubscription?: Subscription;
   private destroy$ = new Subject<void>();
@@ -96,13 +89,6 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   hintMove: {from: Position, to: Position, piece: Piece} | null = null;
   showHintOnBoard = false;
   
-  // Pre-move variables
-  preMoveFrom: Position | null = null;
-  preMoveTo: Position | null = null;
-  preMoveQueue: PreMove[] = []; // Replace preMoveChain with a proper queue
-  virtualPiecePositions: Map<string, Position> = new Map(); // Maps piece key to its virtual position
-  processingPreMove: boolean = false; // Flag to prevent multiple executions
-  
   // Evaluation bar
   evaluationScore = 0;
   
@@ -121,6 +107,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   moveQualityMessage: string = '';
   isAnalyzing: boolean = false;
   analysisCache: Map<number, { quality: MoveQuality, message: string, evaluation: number }> = new Map();
+  
+  // Add processingPreMove flag to the component
+  private processingPreMove = false;
   
   constructor(private elementRef: ElementRef) {}
   
@@ -142,7 +131,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
         
         // After a short delay to let the move complete, check for pre-moves
         setTimeout(() => {
-          if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0) {
+          if (this.board.currentPlayer === 'white' && this.preMoveService.preMoveQueue.length > 0) {
             this.executeNextPreMove();
           }
         }, 500);
@@ -160,7 +149,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
           this.updateEvaluation();
           
           // Check if we should execute pre-moves
-          if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0) {
+          if (this.board.currentPlayer === 'white' && this.preMoveService.preMoveQueue.length > 0) {
             this.executeNextPreMove();
           }
         }
@@ -196,7 +185,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       if (this.isReplayMode || this.showPromotionModal) return;
       
       // Check if a pre-move should be executed
-      if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0 && !this.processingPreMove) {
+      if (this.board.currentPlayer === 'white' && this.preMoveService.preMoveQueue.length > 0 && !this.processingPreMove) {
         this.processingPreMove = true;
         setTimeout(() => {
           this.executeNextPreMove();
@@ -211,7 +200,10 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       }
       
       if (this.board.currentPlayer === 'black') {
-        this.botService.makeBotMove();
+        // Let the bot service make its move
+        setTimeout(() => {
+          this.botService.makeBotMove();
+        }, 500);
       }
     };
     
@@ -253,6 +245,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     // Check if game is over after a move
     if (this.board.isCheckmate || this.board.isStalemate) {
       this.showGameOverModal = true;
+      return;
     }
     
     // Update evaluation after move
@@ -264,7 +257,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     }
 
     // Execute pre-moves if it's now the player's turn and we have pre-moves queued
-    if (this.board.currentPlayer === 'white' && this.preMoveQueue.length > 0 && !this.isReplayMode) {
+    if (this.board.currentPlayer === 'white' && this.preMoveService.preMoveQueue.length > 0 && !this.isReplayMode) {
       // Small delay to allow UI to update first
       setTimeout(() => {
         this.executeNextPreMove();
@@ -327,10 +320,10 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     }
     
     // If we have an active pre-move and click on a destination
-    if (this.preMoveFrom && board.currentPlayer !== 'white') {
+    if (this.preMoveService.activeFrom && board.currentPlayer !== 'white') {
       // Get the piece we're trying to move
-      const fromRow = this.preMoveFrom.row;
-      const fromCol = this.preMoveFrom.col;
+      const fromRow = this.preMoveService.activeFrom.row;
+      const fromCol = this.preMoveService.activeFrom.col;
       const piece = board.squares[fromRow][fromCol];
       
       if (piece) {
@@ -341,13 +334,13 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
         
         // Check if the target square is a legal move
         if (legalMoves.some(move => move.row === row && move.col === col)) {
-          this.setPreMoveDestination(row, col);
+          this.preMoveService.setPreMoveDestination(row, col);
           return;
         }
       }
       
       // If clicked on an invalid destination, just clear the pre-move
-      this.preMoveFrom = null;
+      this.preMoveService.clearPreMoves();
       return;
     }
     
@@ -534,7 +527,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     // Clear move evaluation and other visual indicators
     this.currentMoveEvaluation = '';
     this.showHintOnBoard = false;
-    this.clearPreMoves();
+    this.preMoveService.clearPreMoves();
     
     // Start analyzing the first position
     this.analyzePosition();
@@ -767,7 +760,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     let realCol = col;
     
     // If the piece is a virtual piece, find its original position
-    const origPos = this.getOriginalPositionOfVirtualPieceAt(row, col);
+    const origPos = this.preMoveService.getOriginalPositionOfVirtualPieceAt(row, col);
     if (origPos) {
       realRow = origPos.row;
       realCol = origPos.col;
@@ -776,184 +769,50 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     const piece = this.board.squares[realRow][realCol];
     if (!piece || piece.color !== 'white') return;
     
-    this.preMoveFrom = { row, col };
-    this.preMoveTo = null;
+    this.preMoveService.startPreMove(row, col);
   }
   
   // Set the destination for a pre-move
   setPreMoveDestination(row: number, col: number): void {
-    if (!this.preMoveFrom) return;
-    
-    this.preMoveTo = { row, col };
-    
-    // Get the original position of the piece
-    const originalPosition = this.preMoveFrom;
-    
-    // Create a unique ID for this pre-move
-    const pieceId = this.getPieceKey(originalPosition.row, originalPosition.col);
-    const preMoveId = `${pieceId}-${Date.now()}`;
-    
-    // Add to pre-move queue
-    const preMove: PreMove = {
-      id: preMoveId,
-      pieceId: pieceId,
-      from: { ...this.preMoveFrom },
-      to: { ...this.preMoveTo },
-      originalPosition: { ...originalPosition }
-    };
-    
-    this.preMoveQueue.push(preMove);
-    
-    // Update virtual positions
-    this.updateVirtualPositions();
-    
-    console.log(`Added pre-move: ${originalPosition.row},${originalPosition.col} to ${row},${col}`);
-    console.log(`Pre-move queue now has ${this.preMoveQueue.length} moves`);
-    
-    // Reset for next pre-move
-    this.preMoveFrom = null;
-    this.preMoveTo = null;
+    if (!this.preMoveService.activeFrom) return;
+    this.preMoveService.setPreMoveDestination(row, col);
   }
   
-  // Clear all pre-moves
-  clearPreMoves(): void {
-    this.preMoveFrom = null;
-    this.preMoveTo = null;
-    this.preMoveQueue = [];
-    this.virtualPiecePositions.clear();
-  }
-
   // Execute the next pre-move in the queue
   executeNextPreMove(): void {
-    if (this.preMoveQueue.length === 0) return;
+    this.preMoveService.executeNextPreMove();
     
-    // Get the first pre-move in the queue
-    const preMove = this.preMoveQueue[0];
-    
-    // Check if it's now the player's turn
-    if (this.board.currentPlayer !== 'white') return;
-    
-    // Get the piece at its original position
-    const piece = this.board.squares[preMove.originalPosition.row][preMove.originalPosition.col];
-    
-    // Verify the piece still exists and is the right color
-    if (!piece || piece.color !== 'white') {
-      // Invalid pre-move, remove it and try the next one
-      this.preMoveQueue.shift();
-      this.updateVirtualPositions();
-      
-      // Try the next pre-move if available
-      if (this.preMoveQueue.length > 0) {
-        setTimeout(() => this.executeNextPreMove(), 100);
-      }
-      return;
-    }
-    
-    // Select the piece and check if the move is legal
-    this.gameService.selectPiece(preMove.originalPosition.row, preMove.originalPosition.col);
-    
-    // Check if the move is legal
-    const isLegalMove = this.board.legalMoves.some(
-      move => move.row === preMove.to.row && move.col === preMove.to.col
-    );
-    
-    if (isLegalMove) {
-      // Execute the move
-      let moveSuccessful = false;
-      
-      if (this.isPawnPromotion(piece, preMove.to)) {
-        // For simplicity, auto-promote to queen
-        moveSuccessful = this.gameService.movePieceWithPromotion(
-          preMove.originalPosition,
-          preMove.to,
-          'queen'
-        );
-      } else {
-        moveSuccessful = this.gameService.movePiece(preMove.to.row, preMove.to.col);
-      }
-      
-      if (moveSuccessful) {
-        this.trackLastMove();
-        
-        // Remove the executed pre-move from the queue
-        this.preMoveQueue.shift();
-        this.updateVirtualPositions();
-      } else {
-        // Move failed, remove it and try the next one
-        this.preMoveQueue.shift();
-        this.updateVirtualPositions();
-        
-        if (this.preMoveQueue.length > 0) {
-          setTimeout(() => this.executeNextPreMove(), 100);
-        }
-      }
-    } else {
-      // If move is not legal, remove it and try the next one
-      this.preMoveQueue.shift();
-      this.updateVirtualPositions();
-      
-      if (this.preMoveQueue.length > 0) {
-        setTimeout(() => this.executeNextPreMove(), 100);
-      }
-    }
+    // Track last move after execution
+    this.trackLastMove();
   }
   
-  // Update virtual positions after pre-move changes
+  // Update virtual positions after pre-move changes (wrapper for service method)
   private updateVirtualPositions(): void {
-    this.virtualPiecePositions.clear();
+    // Just using this as a convenience wrapper - we can't access the private method directly
+    this.preMoveService.clearPreMoves();
     
-    // Process pre-moves in order to build up the virtual positions
-    for (const move of this.preMoveQueue) {
-      this.virtualPiecePositions.set(move.pieceId, { row: move.to.row, col: move.to.col });
+    // Re-add all premoves (this is a workaround since we can't call the private method)
+    for (const preMove of this.preMoveService.preMoveQueue) {
+      this.preMoveService.setPreMoveDestination(preMove.to.row, preMove.to.col);
     }
   }
 
   // Check if a piece is part of the pre-move queue
   isPieceInPreMoveQueue(row: number, col: number): boolean {
-    // Get the original position if it's a virtual piece
-    let originalRow = row;
-    let originalCol = col;
-    const virtualOrigPos = this.getOriginalPositionOfVirtualPieceAt(row, col);
-    if (virtualOrigPos) {
-      originalRow = virtualOrigPos.row;
-      originalCol = virtualOrigPos.col;
-    }
-    
-    const pieceId = this.getPieceKey(originalRow, originalCol);
-    
-    // Check if this piece ID is in any pre-move
-    return this.preMoveQueue.some(move => move.pieceId === pieceId);
+    return this.preMoveService.hasPiecePreMove(row, col);
   }
   
   // Cancel all pre-moves for a specific piece
   cancelPreMovesForPiece(row: number, col: number): void {
-    // Get the original position if it's a virtual piece
-    let originalRow = row;
-    let originalCol = col;
-    const virtualOrigPos = this.getOriginalPositionOfVirtualPieceAt(row, col);
-    if (virtualOrigPos) {
-      originalRow = virtualOrigPos.row;
-      originalCol = virtualOrigPos.col;
-    }
-    
-    const pieceId = this.getPieceKey(originalRow, originalCol);
-    
-    // Filter out pre-moves that involve this piece
-    const filteredPreMoves = this.preMoveQueue.filter(move => move.pieceId !== pieceId);
-    
-    // If we removed any pre-moves, update the queue
-    if (filteredPreMoves.length !== this.preMoveQueue.length) {
-      this.preMoveQueue = filteredPreMoves;
-      this.updateVirtualPositions();
-    }
+    this.preMoveService.cancelPreMovesForPiece(row, col);
   }
 
   // Check if a position is part of a pre-move
   isPreMove(row: number, col: number): boolean {
-    if (this.preMoveQueue.length === 0) return false;
+    if (this.preMoveService.preMoveQueue.length === 0) return false;
     
     // Check if position is part of any pre-move in the queue
-    return this.preMoveQueue.some(move => 
+    return this.preMoveService.preMoveQueue.some(move => 
       (move.from.row === row && move.from.col === col) || 
       (move.to.row === row && move.to.col === col)
     );
@@ -961,10 +820,10 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // Check if a position is the destination of a pre-move
   isPreMoveDestination(row: number, col: number): boolean {
-    if (this.preMoveQueue.length === 0) return false;
+    if (this.preMoveService.preMoveQueue.length === 0) return false;
     
     // Check if position is the destination of any pre-move in the queue
-    return this.preMoveQueue.some(move => move.to.row === row && move.to.col === col);
+    return this.preMoveService.preMoveQueue.some(move => move.to.row === row && move.to.col === col);
   }
 
   // Generate a unique key for a piece based on its position
@@ -974,32 +833,23 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // Get the virtual position of a piece after pre-moves
   getVirtualPosition(row: number, col: number): Position {
-    const key = this.getPieceKey(row, col);
-    if (this.virtualPiecePositions.has(key)) {
-      return this.virtualPiecePositions.get(key)!;
-    }
-    return { row, col };
+    const virtualPos = this.preMoveService.getVirtualPosition(row, col);
+    return virtualPos || { row, col };
   }
   
   // Check if a piece has a virtual position
   hasVirtualPosition(row: number, col: number): boolean {
-    const key = this.getPieceKey(row, col);
-    return this.virtualPiecePositions.has(key);
+    return !!this.preMoveService.getVirtualPosition(row, col);
   }
   
   // Check if a position has a virtual piece on it
   hasVirtualPieceAt(row: number, col: number): boolean {
-    for (const [_, pos] of this.virtualPiecePositions) {
-      if (pos.row === row && pos.col === col) {
-        return true;
-      }
-    }
-    return false;
+    return this.preMoveService.hasVirtualPieceAt(row, col);
   }
   
   // Get the original position of a piece that's virtually at the given position
   getOriginalPositionOfVirtualPieceAt(row: number, col: number): Position | null {
-    for (const [key, pos] of this.virtualPiecePositions) {
+    for (const [key, pos] of this.preMoveService.virtualPositions.entries()) {
       if (pos.row === row && pos.col === col) {
         const [origRow, origCol] = key.split(',').map(Number);
         return { row: origRow, col: origCol };
@@ -1016,7 +866,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     const piece = board.squares[row][col];
     if (piece) {
       const key = this.getPieceKey(row, col);
-      if (!this.virtualPiecePositions.has(key)) {
+      if (!this.preMoveService.virtualPositions.has(key)) {
         return piece;
       }
     }
@@ -1210,11 +1060,9 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     }
     
     // Allow dragging own pieces even when it's not your turn (for pre-moves)
-    if (piece.color === 'white' && this.board.currentPlayer === 'black' &&
-        (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsPlayer())) {
+    if (piece.color === 'white' && this.board.currentPlayer === 'black') {
       // Start a pre-move
-      this.preMoveFrom = { row, col };
-      this.preMoveTo = null;
+      this.preMoveService.startPreMove(row, col);
       
       // Set data to transfer
       if (event.dataTransfer) {
@@ -1246,33 +1094,8 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       return; // Don't prevent default to disallow drop
     }
     
-    // For normal moves
-    if (this.draggedPiece) {
-      // Check if this is a legal move
-      if (this.isLegalMove(row, col)) {
-        event.preventDefault(); // Allow the drop
-      }
-      return;
-    }
-    
-    // For pre-moves, check if the move would be valid
-    if (this.preMoveFrom) {
-      const fromRow = this.preMoveFrom.row;
-      const fromCol = this.preMoveFrom.col;
-      const piece = this.board.squares[fromRow][fromCol];
-      
-      if (piece) {
-        // Calculate what would be legal moves for this piece
-        this.gameService.selectPiece(fromRow, fromCol);
-        const legalMoves = [...this.board.legalMoves]; // Create a copy
-        this.gameService.clearSelection(); // Clear the selection to not affect the UI
-        
-        // Check if the target square is a legal move
-        if (legalMoves.some(move => move.row === row && move.col === col)) {
-          event.preventDefault(); // Allow the drop
-        }
-      }
-    }
+    // Allow drop for both normal moves and pre-moves
+    event.preventDefault();
   }
   
   // Handle drop event
@@ -1284,54 +1107,52 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     const data = event.dataTransfer?.getData('text/plain');
     
     // Handle pre-moves
-    if (data?.startsWith('premove:') && this.preMoveFrom) {
-      // Get the piece we're trying to move
-      const fromRow = this.preMoveFrom.row;
-      const fromCol = this.preMoveFrom.col;
-      const piece = this.board.squares[fromRow][fromCol];
+    if (data?.startsWith('premove:')) {
+      const coords = data.replace('premove:', '').split(',').map(Number);
+      const fromRow = coords[0];
+      const fromCol = coords[1];
       
-      if (piece) {
-        // Calculate what would be legal moves for this piece
-        this.gameService.selectPiece(fromRow, fromCol);
-        const legalMoves = [...this.board.legalMoves]; // Create a copy
-        this.gameService.clearSelection(); // Clear the selection to not affect the UI
-        
-        // Check if the target square is a legal move
-        if (legalMoves.some(move => move.row === row && move.col === col)) {
-          this.preMoveTo = { row, col };
-          this.setPreMoveDestination(row, col);
-        }
+      // Start pre-move if not already started
+      if (!this.preMoveService.activeFrom) {
+        this.preMoveService.startPreMove(fromRow, fromCol);
       }
       
-      this.preMoveFrom = null;
+      // Set destination
+      this.preMoveService.setPreMoveDestination(row, col);
       return;
     }
     
     // Handle normal moves
-    if (!this.draggedPiece) return;
-    
-    // Check for pawn promotion
-    if (this.isPawnPromotion(this.draggedPiece, { row, col })) {
-      this.pendingPromotionMove = {
-        from: { ...this.draggedPiece.position },
-        to: { row, col }
-      };
-      this.promotionPosition = { row, col };
-      this.showPromotionModal = true;
-      return;
-    }
-    
-    // Move the piece if it's a legal move
-    if (this.isLegalMove(row, col)) {
-      const moveSuccessful = this.gameService.movePiece(row, col);
+    if (data && !data.startsWith('premove:')) {
+      const [fromRow, fromCol] = data.split(',').map(Number);
+      this.draggedPiece = this.board.squares[fromRow][fromCol];
       
-      if (moveSuccessful) {
-        this.trackLastMove();
-        this.showHintOnBoard = false;
+      if (!this.draggedPiece) return;
+      
+      // Check for pawn promotion
+      if (this.isPawnPromotion(this.draggedPiece, { row, col })) {
+        this.pendingPromotionMove = {
+          from: { row: fromRow, col: fromCol },
+          to: { row, col }
+        };
+        this.promotionPosition = { row, col };
+        this.showPromotionModal = true;
+        return;
       }
+      
+      // Move the piece if it's a legal move
+      this.gameService.selectPiece(fromRow, fromCol);
+      if (this.isLegalMove(row, col)) {
+        const moveSuccessful = this.gameService.movePiece(row, col);
+        
+        if (moveSuccessful) {
+          this.trackLastMove();
+          this.showHintOnBoard = false;
+        }
+      }
+      
+      this.draggedPiece = null;
     }
-    
-    this.draggedPiece = null;
   }
   
   // End drag
@@ -1447,15 +1268,16 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   
   // Get the piece that should be visualized at a position
   getVirtualPieceAt(row: number, col: number): Piece | null {
-    const origPos = this.getOriginalPositionOfVirtualPieceAt(row, col);
-    if (origPos) {
-      return this.board.squares[origPos.row][origPos.col];
-    }
-    return null;
+    return this.preMoveService.getVirtualPieceAt(row, col, this.board);
   }
 
   // Add this getter to map preMoveQueue to preMoveChain for template compatibility
   get preMoveChain(): PreMove[] {
-    return this.preMoveQueue;
+    return this.preMoveService.preMoveQueue;
+  }
+
+  // Clear all pre-moves (wrapper for service method)
+  clearPreMoves(): void {
+    this.preMoveService.clearPreMoves();
   }
 } 
