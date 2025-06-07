@@ -85,7 +85,7 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
   private subscriptions: Subscription[] = [];
   
   // Backend information
-  backendInfo: { backend: string; isGPU: boolean; memoryInfo?: any } = {
+  backendInfo: { backend: string; isGPU: boolean; memoryInfo?: any; gpuDetails?: any } = {
     backend: 'unknown',
     isGPU: false
   };
@@ -615,6 +615,19 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     }
   }
   
+  async downloadModel(): Promise<void> {
+    try {
+      const filename = `chess-model-${Date.now()}`;
+      await this.trainingService.downloadModel(filename);
+      
+      // Show success message with instructions
+      alert(`Model downloaded successfully!\n\nFiles created:\n• ${filename}.json (model architecture)\n• ${filename}.weights.bin (model weights)\n\nTo use in Player vs AI:\n1. Select the .json file when using single file method\n2. Or select both files when using two files method`);
+    } catch (error) {
+      console.error('Error downloading model:', error);
+      alert('Error downloading model. Please try again.');
+    }
+  }
+  
   // Export training data
   exportTrainingData(): void {
     const data = {
@@ -777,26 +790,82 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     const network = this.trainingService.getNetwork();
     if (network) {
       this.backendInfo = network.getBackendInfo();
-      console.log('Training backend info:', this.backendInfo);
+      
+      // Log detailed GPU information
+      if (this.backendInfo.gpuDetails) {
+        console.log('Detailed GPU Information:', this.backendInfo.gpuDetails);
+        
+        if (this.backendInfo.gpuDetails.isDedicatedGPU) {
+          console.log('✅ Using dedicated GPU for training');
+        } else if (this.backendInfo.gpuDetails.renderer) {
+          console.warn('⚠️ May be using integrated GPU:', this.backendInfo.gpuDetails.renderer);
+        }
+
+        if (this.backendInfo.gpuDetails.optimizations) {
+          console.log('GPU Optimizations:', this.backendInfo.gpuDetails.optimizations);
+        }
+      }
     }
   }
 
   getBackendStatusClass(): string {
-    return this.backendInfo.isGPU ? 'text-green-400' : 'text-yellow-400';
+    if (!this.backendInfo.isGPU) return 'text-red-400';
+    
+    if (this.backendInfo.backend === 'webgpu') return 'text-green-400';
+    
+    if (this.backendInfo.gpuDetails?.isDedicatedGPU) {
+      return 'text-green-400';
+    }
+    
+    return 'text-yellow-400';
   }
 
   getBackendStatusText(): string {
-    const backend = this.backendInfo.backend.toUpperCase();
-    return this.backendInfo.isGPU ? `${backend} (GPU)` : `${backend} (CPU)`;
+    if (!this.backendInfo.isGPU) return 'CPU (No GPU acceleration)';
+    
+    if (this.backendInfo.backend === 'webgpu') {
+      return 'WebGPU (High-performance)';
+    }
+    
+    if (this.backendInfo.gpuDetails?.isDedicatedGPU) {
+      return `WebGL (Dedicated GPU: ${this.backendInfo.gpuDetails.renderer || 'Unknown'})`;
+    }
+    
+    if (this.backendInfo.gpuDetails?.renderer) {
+      return `WebGL (${this.backendInfo.gpuDetails.renderer})`;
+    }
+    
+    return 'WebGL (GPU acceleration)';
   }
 
   getMemoryUsage(): string {
-    if (this.backendInfo.memoryInfo) {
-      const memory = this.backendInfo.memoryInfo;
-      if (memory.numTensors !== undefined) {
-        return `Tensors: ${memory.numTensors}, Bytes: ${(memory.numBytes / 1024 / 1024).toFixed(1)}MB`;
-      }
+    if (!this.backendInfo.memoryInfo) return 'N/A';
+    
+    const memory = this.backendInfo.memoryInfo;
+    const totalMB = Math.round((memory.numBytes || 0) / 1024 / 1024);
+    const tensors = memory.numTensors || 0;
+    
+    let result = `${totalMB} MB, ${tensors} tensors`;
+    
+    // Add GPU-specific memory info if available
+    if (memory.numBytesInGPU) {
+      const gpuMB = Math.round(memory.numBytesInGPU / 1024 / 1024);
+      result += `, ${gpuMB} MB GPU`;
     }
-    return 'Memory info unavailable';
+    
+    return result;
+  }
+
+  getOptimizationStatus(): string {
+    if (!this.backendInfo.gpuDetails?.optimizations) return 'Standard';
+    
+    const opts = this.backendInfo.gpuDetails.optimizations;
+    const enabled = [];
+    
+    if (opts.f16Textures) enabled.push('F16');
+    if (opts.float32Capable) enabled.push('F32');
+    if (opts.packEnabled) enabled.push('Packed');
+    
+    return enabled.length > 0 ? enabled.join(', ') : 'Standard';
   }
 } 

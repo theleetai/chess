@@ -362,6 +362,17 @@ export class TrainingService {
     }
   }
   
+  // Download the neural network model
+  async downloadModel(filename?: string): Promise<void> {
+    try {
+      await this.network.downloadModel(filename);
+      console.log('Model download started');
+    } catch (error) {
+      console.error('Error downloading model:', error);
+      throw error;
+    }
+  }
+  
   // Load a saved model
   async loadModel(): Promise<void> {
     try {
