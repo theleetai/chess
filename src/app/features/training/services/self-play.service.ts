@@ -61,7 +61,23 @@ export class SelfPlayService {
   public stats$ = this.statsSubject.asObservable();
   public trainingData$ = this.trainingDataSubject.asObservable();
   
-  constructor(private network: ChessNetwork) {}
+  constructor(private network: ChessNetwork) {
+    // Ensure we start with a completely clean state
+    this.games.clear();
+    this.replayBuffer = [];
+    
+    // Emit initial empty stats to prevent any phantom games
+    this.statsSubject.next({
+      gamesCompleted: 0,
+      gamesInProgress: 0,
+      totalMoves: 0,
+      whiteWins: 0,
+      blackWins: 0,
+      draws: 0,
+      averageGameLength: 0,
+      examplesGenerated: 0
+    });
+  }
   
   // Start parallel self-play games
   async startSelfPlay(

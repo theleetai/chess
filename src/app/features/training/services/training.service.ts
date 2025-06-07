@@ -73,6 +73,13 @@ export class TrainingService {
   ) {
     this.trainingState = this.stateSubject.value;
     
+    // Ensure we start with completely clean state - no training, no games
+    this.trainingState.isTraining = false;
+    this.trainingState.isPaused = false;
+    
+    // Reset self-play service to ensure no existing games
+    this.selfPlayService.reset();
+    
     // Initialize current stats and subscribe to updates
     this.currentStats = {
       gamesCompleted: 0,

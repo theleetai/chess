@@ -21,7 +21,7 @@ import { CommonModule } from '@angular/common';
       </div>
       
       <div class="network-container" #networkContainer>
-        <svg class="network-svg" [attr.width]="svgWidth" [attr.height]="svgHeight">
+        <svg class="network-svg" [attr.width]="svgWidth" [attr.height]="svgHeight" [attr.viewBox]="'0 0 ' + svgWidth + ' ' + svgHeight">
           <!-- Network Architecture -->
           <g class="layers">
             <g 
@@ -33,8 +33,8 @@ import { CommonModule } from '@angular/common';
               <rect 
                 class="layer-bg"
                 [attr.width]="layerWidth"
-                [attr.height]="svgHeight - 40"
-                [attr.y]="20"
+                [attr.height]="svgHeight - 60"
+                [attr.y]="30"
                 rx="8"
               ></rect>
               
@@ -42,7 +42,7 @@ import { CommonModule } from '@angular/common';
               <text 
                 class="layer-label"
                 [attr.x]="layerWidth / 2"
-                [attr.y]="15"
+                [attr.y]="20"
                 text-anchor="middle"
               >
                 {{ layer.name }}
@@ -54,7 +54,7 @@ import { CommonModule } from '@angular/common';
                   class="neuron"
                   *ngFor="let neuron of layer.neurons; let j = index"
                   [attr.cx]="layerWidth / 2"
-                  [attr.cy]="30 + (j * neuronSpacing)"
+                  [attr.cy]="getNeuronY(i, j)"
                   [attr.r]="neuronRadius"
                   [attr.fill]="getNeuronColor(i, j)"
                   [attr.opacity]="getNeuronOpacity(i, j)"
@@ -65,7 +65,7 @@ import { CommonModule } from '@angular/common';
               <text 
                 class="layer-stats"
                 [attr.x]="layerWidth / 2"
-                [attr.y]="svgHeight - 5"
+                [attr.y]="svgHeight - 10"
                 text-anchor="middle"
               >
                 {{ layer.neurons.length }} units
@@ -130,7 +130,7 @@ export class NetworkVisualizerComponent implements OnChanges, AfterViewInit {
   
   // SVG dimensions and layout
   svgWidth = 800;
-  svgHeight = 300;
+  svgHeight = 400; // Will be calculated dynamically
   layerSpacing = 150;
   layerPadding = 50;
   layerWidth = 80;
@@ -151,7 +151,7 @@ export class NetworkVisualizerComponent implements OnChanges, AfterViewInit {
   private updateDimensions(): void {
     if (this.networkContainer?.nativeElement) {
       const containerWidth = this.networkContainer.nativeElement.offsetWidth;
-      this.svgWidth = Math.min(containerWidth - 20, 1000);
+      this.svgWidth = Math.min(containerWidth - 20, 1200); // Allow wider networks
     }
   }
   
@@ -189,7 +189,11 @@ export class NetworkVisualizerComponent implements OnChanges, AfterViewInit {
     this.parameterCount = this.calculateParameterCount();
     
     // Update spacing based on number of layers
-    this.layerSpacing = Math.max(100, (this.svgWidth - this.layerPadding * 2) / (this.layerCount - 1));
+    this.layerSpacing = Math.max(120, (this.svgWidth - this.layerPadding * 2) / Math.max(1, this.layerCount - 1));
+    
+    // Calculate height based on the largest layer
+    const maxNeurons = Math.max(...this.networkLayers.map(layer => layer.neurons.length));
+    this.svgHeight = Math.max(400, maxNeurons * this.neuronSpacing + 100); // Add padding
     
     // Generate connections between layers
     this.generateConnections();
@@ -217,15 +221,17 @@ export class NetworkVisualizerComponent implements OnChanges, AfterViewInit {
       const nextX = (i + 1) * this.layerSpacing + this.layerPadding;
       
       // Sample connections (show only a subset for performance)
-      const maxConnections = Math.min(50, currentLayer.neurons.length * nextLayer.neurons.length);
+      const maxConnectionsPerNeuron = Math.min(3, nextLayer.neurons.length);
+      const maxSourceNeurons = Math.min(20, currentLayer.neurons.length);
       
-      for (let j = 0; j < Math.min(maxConnections, currentLayer.neurons.length); j++) {
-        for (let k = 0; k < Math.min(3, nextLayer.neurons.length); k++) {
+      for (let j = 0; j < maxSourceNeurons; j++) {
+        for (let k = 0; k < maxConnectionsPerNeuron; k++) {
+          const targetIndex = Math.floor(k * nextLayer.neurons.length / maxConnectionsPerNeuron);
           this.connections.push({
             x1: currentX,
-            y1: 30 + (j * this.neuronSpacing),
+            y1: this.getNeuronY(i, j),
             x2: nextX,
-            y2: 30 + (k * this.neuronSpacing),
+            y2: this.getNeuronY(i + 1, targetIndex),
             weight: (Math.random() - 0.5) * 2 // Random weight between -1 and 1
           });
         }
@@ -235,26 +241,55 @@ export class NetworkVisualizerComponent implements OnChanges, AfterViewInit {
   
   getNeuronColor(layerIndex: number, neuronIndex: number): string {
     const layer = this.networkLayers[layerIndex];
+    if (!layer) return '#6c757d';
     
-    switch (layer.type) {
-      case 'input':
-        return '#61dafb';
-      case 'output':
-        return '#ffc107';
-      default:
-        return '#28a745';
+    if (layer.type === 'input') return '#61dafb';
+    if (layer.type === 'output') return '#ffc107';
+    
+    // Use activation value for hidden layers
+    const activation = layer.neurons[neuronIndex]?.activation || 0;
+    const intensity = Math.abs(activation);
+    
+    return activation > 0 
+      ? `rgb(${Math.floor(255 * (1 - intensity))}, 255, ${Math.floor(255 * (1 - intensity))})`
+      : `rgb(255, ${Math.floor(255 * (1 - intensity))}, ${Math.floor(255 * (1 - intensity))})`;
+  }
+  
+  getNeuronY(layerIndex: number, neuronIndex: number): number {
+    const layer = this.networkLayers[layerIndex];
+    if (!layer) return 50;
+    
+    const neuronCount = layer.neurons.length;
+    const availableHeight = this.svgHeight - 80; // Leave space for labels
+    const startY = 40; // Start position from top
+    
+    if (neuronCount === 1) {
+      // Center single neuron
+      return this.svgHeight / 2;
     }
+    
+    // Distribute neurons evenly in available space
+    const spacing = Math.min(this.neuronSpacing, availableHeight / (neuronCount - 1));
+    const totalHeight = (neuronCount - 1) * spacing;
+    const offsetY = startY + (availableHeight - totalHeight) / 2;
+    
+    return offsetY + (neuronIndex * spacing);
   }
   
   getNeuronOpacity(layerIndex: number, neuronIndex: number): number {
     const layer = this.networkLayers[layerIndex];
-    const neuron = layer.neurons[neuronIndex];
+    if (!layer) return 0.5;
     
-    if (neuron && neuron.activation !== undefined) {
-      return 0.3 + (Math.abs(neuron.activation) * 0.7);
+    // Base opacity
+    let opacity = 0.8;
+    
+    // Adjust based on activation if available
+    const activation = layer.neurons[neuronIndex]?.activation;
+    if (activation !== undefined) {
+      opacity = 0.3 + (Math.abs(activation) * 0.7);
     }
     
-    return 0.5;
+    return Math.max(0.2, Math.min(1, opacity));
   }
   
   getConnectionWidth(weight: number): number {

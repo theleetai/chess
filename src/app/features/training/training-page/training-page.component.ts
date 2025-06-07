@@ -101,7 +101,6 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     this.initializeSubscriptions();
     this.initializeVisualization();
     this.initializeChartsWithLoadingState();
-    this.initializeImmediateGames();
     this.updateBackendInfo();
   }
   
@@ -770,19 +769,8 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
   }
   
   private initializeImmediateGames(): void {
-    // Start a small number of games immediately for visualization
-    const immediateGames = Math.min(this.trainingState.config.numParallelGames, 2);
-    
-    // Create some initial game instances for immediate display
-    for (let i = 0; i < immediateGames; i++) {
-      const gameId = `preview_${Date.now()}_${i}`;
-      // These will be replaced by actual training games shortly
-      this.selfPlayService.startSelfPlay(1, 50, 1.0, 10).then(() => {
-        this.updateActiveGames();
-      });
-    }
-    
-    // Force an immediate update
+    // This method is called when training starts to initialize the game visualization
+    // Force an immediate update to display any active games
     this.updateActiveGames();
   }
   
