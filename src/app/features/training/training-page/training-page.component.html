@@ -184,7 +184,40 @@
             </button>
             
             <div class="game-stats">
-              Active Games: {{ activeGames.length }}
+              {{ getGamesCountText() }}
+            </div>
+            
+            <!-- Load More Controls -->
+            <div class="load-more-controls" *ngIf="showGameVisuals && activeGames.length > 0">
+              <button 
+                type="button"
+                class="btn btn-secondary"
+                *ngIf="hasMoreGames()"
+                (click)="loadMoreGames()"
+              >
+                <i class="fas fa-plus"></i>
+                Load {{ LOAD_MORE_INCREMENT }} More
+              </button>
+              
+              <button 
+                type="button"
+                class="btn btn-info"
+                *ngIf="hasMoreGames()"
+                (click)="showAllGamesByToggle()"
+              >
+                <i class="fas fa-expand"></i>
+                Show All ({{ activeGames.length }})
+              </button>
+              
+              <button 
+                type="button"
+                class="btn btn-warning"
+                *ngIf="showAllGames && activeGames.length > DEFAULT_GAMES_LIMIT"
+                (click)="showLessGames()"
+              >
+                <i class="fas fa-compress"></i>
+                Show Less
+              </button>
             </div>
           </div>
         </div>
@@ -205,16 +238,6 @@
               [heatmapData]="getGameHeatmap(game.id)"
               [showHeatmap]="selectedGameId === game.id && showGameDetails"
             ></app-training-board>
-          </div>
-          
-          <!-- Show more games indicator -->
-          <div 
-            class="more-games-indicator" 
-            *ngIf="activeGames.length > maxVisibleGames"
-          >
-            <div class="more-games-text">
-              +{{ activeGames.length - maxVisibleGames }} more games
-            </div>
           </div>
         </div>
         

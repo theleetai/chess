@@ -74,7 +74,12 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
   showGameDetails: boolean = false;
   showGameVisuals: boolean = true;
   showPerformanceHint: boolean = false;
-  maxVisibleGames: number = 4;
+  
+  // Load more games feature
+  gamesToShow: number = 12;
+  showAllGames: boolean = false;
+  readonly DEFAULT_GAMES_LIMIT = 12;
+  readonly LOAD_MORE_INCREMENT = 8;
   
   // Subscriptions
   private subscriptions: Subscription[] = [];
@@ -212,6 +217,10 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     if (!this.metricsContainer?.nativeElement) return;
 
     try {
+      // Get container dimensions
+      const containerWidth = this.metricsContainer.nativeElement.clientWidth || 350;
+      const containerHeight = 200;
+      
       // Create initial data for all three series to match the series labels
       const initialPoint = [{ x: 0, y: 0 }];
       
@@ -219,8 +228,8 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
         values: [initialPoint, initialPoint, initialPoint], // Three data series
         series: ['Total Loss', 'Policy Loss', 'Value Loss']
       }, {
-        width: 350,
-        height: 200,
+        width: containerWidth - 20, // Leave some padding
+        height: containerHeight,
         xLabel: 'Training Batch',
         yLabel: 'Loss Value'
       });
@@ -233,19 +242,24 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     if (!this.eloContainer?.nativeElement) return;
 
     try {
+      // Get container dimensions
+      const containerWidth = this.eloContainer.nativeElement.clientWidth || 350;
+      const containerHeight = 200;
+      
+      // Create initial data
+      const initialPoint = [{ x: 0, y: 1200 }];
+      
       this.eloChart = tfvis.render.linechart(this.eloContainer.nativeElement, {
-        values: [
-          { x: 0, y: 1200 } // Initial dummy data point with reasonable Elo starting value
-        ],
-        series: ['Estimated Elo']
+        values: [initialPoint],
+        series: ['Elo Rating']
       }, {
-        width: 350,
-        height: 200,
+        width: containerWidth - 20, // Leave some padding
+        height: containerHeight,
         xLabel: 'Training Batch',
         yLabel: 'Elo Rating'
       });
     } catch (error) {
-      console.error('Error creating Elo chart:', error);
+      console.error('Error creating elo chart:', error);
     }
   }
   
@@ -253,6 +267,10 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     if (!this.metricsContainer?.nativeElement || !newMetrics) return;
 
     try {
+      // Get container dimensions
+      const containerWidth = this.metricsContainer.nativeElement.clientWidth || 350;
+      const containerHeight = 200;
+      
       // Update metrics data
       const recentMetrics = this.trainingService.getRecentMetrics(100);
       
@@ -266,18 +284,16 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
           typeof point.x === 'number' && 
           typeof point.y === 'number' && 
           !isNaN(point.x) && 
-          !isNaN(point.y) && 
-          isFinite(point.x) && 
-          isFinite(point.y)
+          !isNaN(point.y)
         );
-
+      
       if (isValidData(totalLossData) && isValidData(policyLossData) && isValidData(valueLossData)) {
-        tfvis.render.linechart(this.metricsContainer.nativeElement, {
-          values: [totalLossData, policyLossData, valueLossData], // All three series
+        this.metricsChart = tfvis.render.linechart(this.metricsContainer.nativeElement, {
+          values: [totalLossData, policyLossData, valueLossData],
           series: ['Total Loss', 'Policy Loss', 'Value Loss']
         }, {
-          width: 350,
-          height: 200,
+          width: containerWidth - 20, // Leave some padding
+          height: containerHeight,
           xLabel: 'Training Batch',
           yLabel: 'Loss Value'
         });
@@ -291,46 +307,36 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     if (!this.eloContainer?.nativeElement) return;
 
     try {
-      const recentMetrics = this.trainingService.getRecentMetrics(100);
+      // Get container dimensions
+      const containerWidth = this.eloContainer.nativeElement.clientWidth || 350;
+      const containerHeight = 200;
+      
+      const recentMetrics = this.trainingService.getRecentMetrics(50);
       
       if (recentMetrics.length === 0) {
-        // Show initial dummy data
-        tfvis.render.linechart(this.eloContainer.nativeElement, {
-          values: [{ x: 0, y: 1200 }],
-          series: ['Estimated Elo']
-        }, {
-          width: 350,
-          height: 200,
-          xLabel: 'Training Batch',
-          yLabel: 'Elo Rating'
-        });
         return;
       }
-
-      const eloData = recentMetrics.map(metric => ({
-        x: metric.batchesTrained,
-        y: this.calculateEloAtBatch(metric.batchesTrained)
+      
+      const eloData = recentMetrics.map(m => ({
+        x: m.batchesTrained,
+        y: this.calculateEloAtBatch(m.batchesTrained)
       }));
-
-      // Filter valid data points
-      const validEloData = eloData.filter(point => 
+      
+      // Validate data
+      const isValidData = eloData.length > 0 && eloData.every(point => 
         typeof point.x === 'number' && 
         typeof point.y === 'number' && 
         !isNaN(point.x) && 
-        !isNaN(point.y) && 
-        isFinite(point.x) && 
-        isFinite(point.y) &&
-        point.y >= 800 && 
-        point.y <= 3000
+        !isNaN(point.y)
       );
-
-      if (validEloData.length > 0) {
-        tfvis.render.linechart(this.eloContainer.nativeElement, {
-          values: validEloData,
-          series: ['Estimated Elo']
+      
+      if (isValidData) {
+        this.eloChart = tfvis.render.linechart(this.eloContainer.nativeElement, {
+          values: [eloData],
+          series: ['Elo Rating']
         }, {
-          width: 350,
-          height: 200,
+          width: containerWidth - 20, // Leave some padding
+          height: containerHeight,
           xLabel: 'Training Batch',
           yLabel: 'Elo Rating'
         });
@@ -374,17 +380,16 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
   private updateActiveGames(): void {
     const allGames = this.selfPlayService.getActiveGames();
     
-    // Keep only the last 20 games for performance
-    // Prioritize: in-progress games first, then most recent completed games
-    const inProgressGames = allGames.filter(g => !g.isFinished);
-    const completedGames = allGames.filter(g => g.isFinished)
-      .sort((a, b) => parseInt(b.id.split('_')[1]) - parseInt(a.id.split('_')[1]))
-      .slice(0, Math.max(0, 20 - inProgressGames.length));
+    // Show all games without any limit
+    this.activeGames = allGames;
     
-    this.activeGames = [...inProgressGames, ...completedGames];
+    // Reset load more state if current limit exceeds available games
+    if (this.gamesToShow > allGames.length && !this.showAllGames) {
+      this.gamesToShow = Math.min(this.DEFAULT_GAMES_LIMIT, allGames.length);
+    }
     
-    // Update performance hint
-    this.showPerformanceHint = allGames.length > 10;
+    // Update performance hint only if there are a lot of games
+    this.showPerformanceHint = allGames.length > 50;
     
     // If we have a selected game but it's no longer in our visible list, clear selection
     if (this.selectedGameId && !this.activeGames.find(g => g.id === this.selectedGameId)) {
@@ -626,14 +631,56 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     this.showGameVisuals = !this.showGameVisuals;
   }
   
-  // Get visible games (limited for performance)
+  // Load more games functionality
+  loadMoreGames(): void {
+    this.gamesToShow += this.LOAD_MORE_INCREMENT;
+    
+    // If we're now showing all games, set the flag
+    if (this.gamesToShow >= this.activeGames.length) {
+      this.showAllGames = true;
+      this.gamesToShow = this.activeGames.length;
+    }
+  }
+  
+  showAllGamesByToggle(): void {
+    this.showAllGames = true;
+    this.gamesToShow = this.activeGames.length;
+  }
+  
+  showLessGames(): void {
+    this.showAllGames = false;
+    this.gamesToShow = this.DEFAULT_GAMES_LIMIT;
+  }
+  
+  // Check if there are more games to show
+  hasMoreGames(): boolean {
+    return !this.showAllGames && this.activeGames.length > this.gamesToShow;
+  }
+  
+  // Get count text for games
+  getGamesCountText(): string {
+    const visible = this.getVisibleGames().length;
+    const total = this.activeGames.length;
+    
+    if (visible === total) {
+      return `Showing all ${total} games`;
+    } else {
+      return `Showing ${visible} of ${total} games`;
+    }
+  }
+  
+  // Get visible games (with load more functionality)
   getVisibleGames(): GameInstance[] {
     if (!this.showGameVisuals) {
       return [];
     }
     
-    // Return the games, limited to maxVisibleGames for performance
-    return this.activeGames.slice(0, this.maxVisibleGames);
+    if (this.showAllGames) {
+      return this.activeGames;
+    }
+    
+    // Return limited number of games
+    return this.activeGames.slice(0, this.gamesToShow);
   }
   
   // Get game board state
