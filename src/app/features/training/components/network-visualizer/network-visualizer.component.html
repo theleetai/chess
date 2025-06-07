@@ -1,0 +1,147 @@
+<div class="network-visualizer">
+  <div class="viz-header">
+    <h3 class="viz-title">Neural Network Visualization</h3>
+    
+    <div class="viz-controls">
+      <div class="control-group">
+        <label for="layerSelect">Layer:</label>
+        <select 
+          id="layerSelect" 
+          [(ngModel)]="selectedLayerName" 
+          (change)="onLayerChange()">
+          <option value="">Select a layer...</option>
+          <option 
+            *ngFor="let layer of availableLayers" 
+            [value]="layer.name">
+            {{ layer.name }} ({{ layer.type }})
+          </option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="modeSelect">Mode:</label>
+        <select 
+          id="modeSelect" 
+          [(ngModel)]="visualizationMode" 
+          (change)="onModeChange()">
+          <option value="weights">Weights</option>
+          <option value="activations">Activations</option>
+        </select>
+      </div>
+      
+      <div class="control-group" *ngIf="selectedLayer && maxFilters > 1">
+        <label for="filterSelect">Filter:</label>
+        <select 
+          id="filterSelect" 
+          [(ngModel)]="selectedFilter" 
+          (change)="onFilterChange()">
+          <option 
+            *ngFor="let filter of [].constructor(maxFilters); let i = index" 
+            [value]="i">
+            Filter {{ i + 1 }}
+          </option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label for="colorSelect">Colors:</label>
+        <select 
+          id="colorSelect" 
+          [(ngModel)]="colorScheme" 
+          (change)="onColorSchemeChange()">
+          <option value="RdBu">Red-Blue</option>
+          <option value="RdYlBu">Red-Yellow-Blue</option>
+          <option value="Viridis">Viridis</option>
+          <option value="Plasma">Plasma</option>
+          <option value="Inferno">Inferno</option>
+        </select>
+      </div>
+      
+      <button 
+        class="btn btn-small" 
+        (click)="resetZoom()">
+        Reset Zoom
+      </button>
+    </div>
+  </div>
+  
+  <div class="viz-content">
+    <div class="viz-main">
+      <div #vizContainer class="visualization-container"></div>
+    </div>
+    
+    <div class="viz-sidebar">
+      <div class="layer-info" *ngIf="selectedLayer">
+        <h4>Layer Information</h4>
+        
+        <div class="info-item">
+          <span class="info-label">Name:</span>
+          <span class="info-value">{{ selectedLayer.name }}</span>
+        </div>
+        
+        <div class="info-item">
+          <span class="info-label">Type:</span>
+          <span class="info-value">{{ selectedLayer.type }}</span>
+        </div>
+        
+        <div class="info-item">
+          <span class="info-label">Shape:</span>
+          <span class="info-value">{{ selectedLayer.shape.join(' × ') }}</span>
+        </div>
+        
+        <div class="info-item" *ngIf="currentData">
+          <span class="info-label">Parameters:</span>
+          <span class="info-value">{{ currentData.length | number }}</span>
+        </div>
+        
+        <div class="info-item" *ngIf="currentData">
+          <span class="info-label">Min Value:</span>
+          <span class="info-value">{{ minValue | number:'1.6-6' }}</span>
+        </div>
+        
+        <div class="info-item" *ngIf="currentData">
+          <span class="info-label">Max Value:</span>
+          <span class="info-value">{{ maxValue | number:'1.6-6' }}</span>
+        </div>
+      </div>
+      
+      <div class="network-stats">
+        <h4>Network Statistics</h4>
+        
+        <div class="info-item">
+          <span class="info-label">Total Parameters:</span>
+          <span class="info-value">{{ getParameterCount() | number }}</span>
+        </div>
+        
+        <div class="info-item">
+          <span class="info-label">Available Layers:</span>
+          <span class="info-value">{{ availableLayers.length }}</span>
+        </div>
+        
+        <div class="info-item">
+          <span class="info-label">Mode:</span>
+          <span class="info-value">{{ visualizationMode | titlecase }}</span>
+        </div>
+      </div>
+      
+      <div class="viz-instructions">
+        <h4>Instructions</h4>
+        <ul>
+          <li>Select a layer to visualize its weights or activations</li>
+          <li>Use mouse wheel to zoom in/out</li>
+          <li>Click and drag to pan around</li>
+          <li>Hover over elements for detailed values</li>
+          <li>Switch between weights and activations modes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div class="viz-empty" *ngIf="availableLayers.length === 0">
+    <div class="empty-content">
+      <i class="fas fa-network-wired empty-icon"></i>
+      <h4>No Network Data Available</h4>
+      <p>Train the neural network to visualize weights and activations.</p>
+    </div>
+  </div>
+</div> 

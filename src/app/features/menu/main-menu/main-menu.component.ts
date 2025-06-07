@@ -44,6 +44,10 @@ export class MainMenuComponent implements OnInit {
     alert('This feature is coming soon!');
   }
   
+  startTraining(): void {
+    this.router.navigate(['/training']);
+  }
+  
   startCustomGame(): void {
     this.router.navigate(['/builder']);
   }

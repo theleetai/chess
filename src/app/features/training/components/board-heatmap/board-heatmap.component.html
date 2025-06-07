@@ -1,0 +1,64 @@
+<div class="heatmap-container">
+  <div class="heatmap-header">
+    <h3 class="heatmap-title">{{ title }}</h3>
+    
+    <div class="heatmap-controls">
+      <div class="control-group">
+        <label for="colorScheme">Color Scheme:</label>
+        <select 
+          id="colorScheme" 
+          [value]="colorScheme" 
+          (change)="setColorScheme($any($event.target).value)">
+          <option value="Blues">Blues</option>
+          <option value="Reds">Reds</option>
+          <option value="Greens">Greens</option>
+          <option value="Viridis">Viridis</option>
+          <option value="Plasma">Plasma</option>
+          <option value="RdYlBu">Red-Yellow-Blue</option>
+        </select>
+      </div>
+      
+      <div class="control-group">
+        <label>
+          <input 
+            type="checkbox" 
+            [checked]="showValues" 
+            (change)="toggleValues()">
+          Show Values
+        </label>
+      </div>
+      
+      <button 
+        class="btn btn-small" 
+        (click)="clear()">
+        Clear
+      </button>
+    </div>
+  </div>
+  
+  <div class="heatmap-content">
+    <div class="heatmap-board-container">
+      <div #heatmapBoard class="heatmap-board"></div>
+    </div>
+    
+    <div class="heatmap-legend">
+      <div #legend class="legend"></div>
+      
+      <div class="value-range" *ngIf="data.length > 0">
+        <div class="range-item">
+          <span class="range-label">Min:</span>
+          <span class="range-value">{{ minValue | number:'1.3-3' }}</span>
+        </div>
+        
+        <div class="range-item">
+          <span class="range-label">Max:</span>
+          <span class="range-value">{{ maxValue | number:'1.3-3' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="heatmap-info" *ngIf="data.length === 0">
+    <p>No heatmap data available. Start training to see MCTS visit counts.</p>
+  </div>
+</div> 

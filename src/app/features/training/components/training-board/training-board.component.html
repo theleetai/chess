@@ -1,0 +1,59 @@
+<div class="training-board-container" [class.hidden]="!showVisuals">
+  <!-- Game Info Header -->
+  <div class="game-info-header" *ngIf="board">
+    <div class="game-id">Game: {{ gameId }}</div>
+    <div class="game-status" [ngClass]="{
+      'text-red-400': board.isCheck,
+      'text-yellow-400': board.isCheckmate || board.isStalemate,
+      'text-green-400': !board.isCheck && !board.isCheckmate && !board.isStalemate
+    }">
+      {{ getGameStatus() }}
+    </div>
+    <div class="move-count">Move: {{ getMoveCount() }}</div>
+  </div>
+
+  <!-- Chess Board -->
+  <div class="chess-board" *ngIf="board">
+    <div class="board-container" [class.selected-board]="isSelected">
+      <!-- Board rows (8 to 1) -->
+      <div class="board-row" *ngFor="let row of boardRows">
+        <!-- Board columns (a to h) -->
+        <div 
+          class="square" 
+          *ngFor="let col of boardCols"
+          [ngClass]="getSquareClasses(row, col)"
+          [class.last-move]="isLastMove(row, col)"
+        >
+          <!-- Chess piece -->
+          <div class="piece-container" *ngIf="getPieceAt(row, col) as piece">
+            <img 
+              [src]="piece.image" 
+              [alt]="piece.color + ' ' + piece.type"
+              class="chess-piece"
+              draggable="false"
+            >
+          </div>
+
+          <!-- Heatmap overlay -->
+          <div 
+            class="heatmap-overlay" 
+            *ngIf="showHeatmap && getHeatmapIntensity(row, col) > 0"
+            [style.opacity]="getHeatmapIntensity(row, col) / 100"
+          ></div>
+
+          <!-- Square coordinates (for debugging) -->
+          <div class="square-coords" *ngIf="false">
+            {{ row }},{{ col }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- No Board State -->
+  <div class="no-board" *ngIf="!board">
+    <div class="placeholder-board">
+      <div class="placeholder-text">No game data</div>
+    </div>
+  </div>
+</div> 
