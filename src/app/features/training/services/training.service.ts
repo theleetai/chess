@@ -372,7 +372,7 @@ export class TrainingService {
     }
   }
   
-  // Get network for external access (e.g., for visualizations)
+  // Get network instance for backend information
   getNetwork(): ChessNetwork {
     return this.network;
   }
@@ -387,7 +387,7 @@ export class TrainingService {
     return this.selfPlayService.getBufferSize();
   }
   
-  // Get recent training metrics
+  // Get recent metrics for chart updates
   getRecentMetrics(count: number = 100): TrainingMetrics[] {
     return this.trainingState.metrics.slice(-count);
   }

@@ -1,5 +1,7 @@
 import { Injectable } from '@angular/core';
 import * as tf from '@tensorflow/tfjs';
+// Add GPU backend imports
+import '@tensorflow/tfjs-backend-webgl';
 import { Board } from '../../../core/models/board.model';
 import { Piece, PieceColor, PieceType } from '../../../core/models/piece.model';
 
@@ -24,9 +26,71 @@ export class ChessNetwork {
   private isTraining = false;
   private learningRate: number = 0.001;
   private l2Regularization: number = 0.0001;
+  private backendInitialized = false;
 
   constructor() {
-    this.buildModel();
+    this.initializeBackend().then(() => {
+      this.buildModel();
+    });
+  }
+
+  // Initialize TensorFlow.js backend with GPU support
+  private async initializeBackend(): Promise<void> {
+    if (this.backendInitialized) return;
+
+    console.log('Initializing TensorFlow.js backend...');
+    
+    try {
+      // Try to set WebGL (GPU) backend first
+      await tf.setBackend('webgl');
+      await tf.ready();
+      
+      console.log(`TensorFlow.js backend: ${tf.getBackend()}`);
+      console.log('GPU acceleration enabled via WebGL backend');
+      
+      // Log GPU information if available
+      const backendInstance = tf.backend() as any;
+      if (backendInstance && backendInstance.gpgpu) {
+        console.log('WebGL GPU details:', {
+          maxTextureSize: backendInstance.gpgpu.gl.getParameter(backendInstance.gpgpu.gl.MAX_TEXTURE_SIZE),
+          vendor: backendInstance.gpgpu.gl.getParameter(backendInstance.gpgpu.gl.VENDOR),
+          renderer: backendInstance.gpgpu.gl.getParameter(backendInstance.gpgpu.gl.RENDERER)
+        });
+      }
+      
+    } catch (error) {
+      console.warn('Failed to initialize WebGL backend, falling back to CPU:', error);
+      
+      try {
+        // Fallback to CPU backend
+        await tf.setBackend('cpu');
+        await tf.ready();
+        console.log('Using CPU backend as fallback');
+      } catch (cpuError) {
+        console.error('Failed to initialize any backend:', cpuError);
+      }
+    }
+    
+    this.backendInitialized = true;
+  }
+
+  // Get current backend information
+  getBackendInfo(): { backend: string; isGPU: boolean; memoryInfo?: any } {
+    const backend = tf.getBackend();
+    const isGPU = backend === 'webgl';
+    
+    let memoryInfo;
+    try {
+      memoryInfo = tf.memory();
+    } catch (error) {
+      memoryInfo = { error: 'Memory info not available' };
+    }
+    
+    return {
+      backend,
+      isGPU,
+      memoryInfo
+    };
   }
 
   // Method to configure hyperparameters

@@ -293,6 +293,18 @@
             <h4>Elo</h4>
             <div class="status-value">{{ getCurrentElo() | number:'1.0-0' }}</div>
           </div>
+          
+          <div class="status-card">
+            <h4>Backend</h4>
+            <div class="status-value" [ngClass]="getBackendStatusClass()">
+              {{ getBackendStatusText() }}
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Memory</h4>
+            <div class="status-value">{{ getMemoryUsage() }}</div>
+          </div>
         </div>
       </div>
 

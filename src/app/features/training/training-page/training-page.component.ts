@@ -84,17 +84,25 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
   // Subscriptions
   private subscriptions: Subscription[] = [];
   
-  // Empty heatmap for inactive games
+  // Backend information
+  backendInfo: { backend: string; isGPU: boolean; memoryInfo?: any } = {
+    backend: 'unknown',
+    isGPU: false
+  };
+  
+  // Heat map for position analysis
   emptyHeatmap = new Map<string, number>();
   
-  // Chart objects
+  // Chart references
   private metricsChart: any;
   private eloChart: any;
   
   ngOnInit(): void {
     this.initializeSubscriptions();
     this.initializeVisualization();
-    this.updateNetworkWeights();
+    this.initializeChartsWithLoadingState();
+    this.initializeImmediateGames();
+    this.updateBackendInfo();
   }
   
   ngOnDestroy(): void {
@@ -763,5 +771,32 @@ export class TrainingPageComponent implements OnInit, OnDestroy {
     
     // Force an immediate update
     this.updateActiveGames();
+  }
+  
+  private updateBackendInfo(): void {
+    const network = this.trainingService.getNetwork();
+    if (network) {
+      this.backendInfo = network.getBackendInfo();
+      console.log('Training backend info:', this.backendInfo);
+    }
+  }
+
+  getBackendStatusClass(): string {
+    return this.backendInfo.isGPU ? 'text-green-400' : 'text-yellow-400';
+  }
+
+  getBackendStatusText(): string {
+    const backend = this.backendInfo.backend.toUpperCase();
+    return this.backendInfo.isGPU ? `${backend} (GPU)` : `${backend} (CPU)`;
+  }
+
+  getMemoryUsage(): string {
+    if (this.backendInfo.memoryInfo) {
+      const memory = this.backendInfo.memoryInfo;
+      if (memory.numTensors !== undefined) {
+        return `Tensors: ${memory.numTensors}, Bytes: ${(memory.numBytes / 1024 / 1024).toFixed(1)}MB`;
+      }
+    }
+    return 'Memory info unavailable';
   }
 } 
