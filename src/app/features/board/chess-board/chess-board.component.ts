@@ -8,6 +8,7 @@ import { BotService } from '../../../core/services/bot.service';
 import { GameStateService } from '../../../core/services/game-state.service';
 import { ChessEngineService, EngineResult, MoveQuality, StockfishResponse } from '../../../core/services/chess-engine.service';
 import { GamePersistenceService } from '../../../core/services/game-persistence.service';
+import { AIService } from '../../../core/services/ai.service';
 import { Piece, Position, PieceType, PieceColor, Move } from '../../../core/models/piece.model';
 import { PreMoveService, PreMove } from '../../../core/services/pre-move.service';
 import { Subscription, interval, Subject } from 'rxjs';
@@ -48,6 +49,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
   private engineService = inject(ChessEngineService);
   private persistenceService = inject(GamePersistenceService);
   protected preMoveService = inject(PreMoveService);
+  protected aiService = inject(AIService);
   
   private botMoveSubscription?: Subscription;
   private destroy$ = new Subject<void>();
@@ -120,8 +122,8 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
       this.gameService.resetGame();
     }
     
-    // If we're in player vs bot mode, subscribe to player moves to trigger bot responses
-    if (this.gameStateService.isPlayerVsBot()) {
+    // If we're in player vs bot or player vs AI mode, subscribe to player moves to trigger bot responses
+    if (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsAI()) {
       this.setupBotMoves();
       
       // Patch the bot service to check for pre-moves after a move
@@ -193,16 +195,16 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
           
           // After executing the pre-move, if it's black's turn, make a bot move
           if (this.board.currentPlayer === 'black') {
-            this.botService.makeBotMove();
+            this.makeBotOrAIMove();
           }
         }, 300);
         return;
       }
       
       if (this.board.currentPlayer === 'black') {
-        // Let the bot service make its move
+        // Let the bot or AI service make its move
         setTimeout(() => {
-          this.botService.makeBotMove();
+          this.makeBotOrAIMove();
         }, 500);
       }
     };
@@ -221,6 +223,23 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     this.botMoveSubscription = new Subscription(() => {
       clearInterval(intervalId);
     });
+  }
+  
+  // Make either a bot move or AI move depending on game mode
+  private async makeBotOrAIMove(): Promise<void> {
+    if (this.gameStateService.isPlayerVsAI() && this.aiService.isReady) {
+      // Use AI service for Player vs AI mode
+      try {
+        await this.aiService.makeAIMove();
+        this.trackLastMove();
+      } catch (error) {
+        console.error('AI move failed, falling back to basic bot:', error);
+        this.botService.makeBotMove();
+      }
+    } else {
+      // Use traditional bot service
+      this.botService.makeBotMove();
+    }
   }
   
   // Getter for the board state
@@ -312,7 +331,7 @@ export class ChessBoardComponent implements OnInit, OnDestroy {
     // If it's not the player's turn and we click on a piece of our color (white)
     if (board.currentPlayer !== 'white' && 
         clickedPiece && clickedPiece.color === 'white' &&
-        (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsPlayer())) {
+        (this.gameStateService.isPlayerVsBot() || this.gameStateService.isPlayerVsPlayer() || this.gameStateService.isPlayerVsAI())) {
       
       // Start a pre-move with this piece
       this.startPreMove(row, col);

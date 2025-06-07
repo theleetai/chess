@@ -1,0 +1,236 @@
+<div class="player-vs-ai-page min-h-screen bg-gray-900 text-white">
+  <!-- Header -->
+  <div class="header bg-gray-800 shadow-lg">
+    <div class="container mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <i class="fas fa-robot text-3xl text-blue-400"></i>
+          <div>
+            <h1 class="text-2xl font-bold text-gradient">Player vs AI</h1>
+            <p class="text-gray-400 text-sm">Upload your trained AI model and play against it</p>
+          </div>
+        </div>
+        <button 
+          class="btn btn-secondary flex items-center space-x-2"
+          (click)="returnToMenu()"
+        >
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Menu</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="container mx-auto px-6 py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      
+      <!-- Model Upload Section -->
+      <div class="space-y-6">
+        <div class="card bg-gray-800 border border-gray-700 p-6">
+          <h2 class="text-xl font-semibold mb-4 flex items-center space-x-2">
+            <i class="fas fa-upload text-blue-400"></i>
+            <span>Load AI Model</span>
+          </h2>
+          
+          <!-- Loading Method Toggle -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-300 mb-3">Loading Method:</label>
+            <div class="flex space-x-4">
+              <button 
+                class="btn"
+                [ngClass]="loadingMethod === 'single' ? 'btn-primary' : 'btn-outline'"
+                (click)="setLoadingMethod('single')"
+              >
+                <i class="fas fa-file"></i>
+                Single File (.json)
+              </button>
+              <button 
+                class="btn"
+                [ngClass]="loadingMethod === 'multiple' ? 'btn-primary' : 'btn-outline'"
+                (click)="setLoadingMethod('multiple')"
+              >
+                <i class="fas fa-files"></i>
+                Two Files (.json + .bin)
+              </button>
+            </div>
+          </div>
+          
+          <!-- Single File Upload -->
+          <div *ngIf="loadingMethod === 'single'" class="space-y-4">
+            <input 
+              #fileInput
+              type="file" 
+              accept=".json"
+              style="display: none"
+              (change)="onFileSelected($event)"
+            />
+            
+            <div class="upload-area border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                 (click)="selectModelFile()">
+              <div class="upload-content">
+                <i class="fas fa-upload text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-lg font-medium mb-2">Select Model JSON File</h3>
+                <p class="text-gray-400 text-sm mb-4">Choose the .json file from your trained AI model</p>
+                <p class="text-xs text-yellow-400 mb-4">
+                  <i class="fas fa-info-circle"></i>
+                  Note: TensorFlow.js will automatically load the corresponding .weights.bin file
+                </p>
+                <button type="button" class="btn btn-primary">
+                  <i class="fas fa-folder-open mr-2"></i>
+                  Browse Files
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Multiple Files Upload -->
+          <div *ngIf="loadingMethod === 'multiple'" class="space-y-4">
+            <input 
+              #multiFileInput
+              type="file" 
+              accept=".json,.bin"
+              multiple
+              style="display: none"
+              (change)="onMultipleFilesSelected($event)"
+            />
+            
+            <div class="upload-area border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                 (click)="selectMultipleFiles()">
+              <div class="upload-content">
+                <i class="fas fa-files text-4xl text-gray-400 mb-4"></i>
+                <h3 class="text-lg font-medium mb-2">Select Both Model Files</h3>
+                <p class="text-gray-400 text-sm mb-4">Choose both the .json and .weights.bin files</p>
+                <button type="button" class="btn btn-primary">
+                  <i class="fas fa-folder-open mr-2"></i>
+                  Browse Files
+                </button>
+              </div>
+            </div>
+            
+            <div class="file-status bg-gray-700 rounded-lg p-4">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-300">Selected Files:</span>
+                <span class="text-sm" [ngClass]="selectedJsonFile && selectedWeightsFile ? 'text-green-400' : 'text-gray-400'">
+                  {{ getMultipleFilesText() }}
+                </span>
+              </div>
+              <button 
+                *ngIf="selectedJsonFile && selectedWeightsFile && !isModelLoaded"
+                class="btn btn-success w-full mt-3"
+                [disabled]="isLoadingModel"
+                (click)="loadMultipleFiles()"
+              >
+                <i class="fas" [ngClass]="isLoadingModel ? 'fa-spinner fa-spin' : 'fa-upload'"></i>
+                {{ isLoadingModel ? 'Loading...' : 'Load Model Files' }}
+              </button>
+            </div>
+          </div>
+          
+          <!-- Model Status -->
+          <div class="model-status bg-gray-700 rounded-lg p-4 mt-6">
+            <div class="flex items-center space-x-3 mb-3">
+              <i class="fas" 
+                 [ngClass]="{
+                   'fa-spinner fa-spin text-yellow-400': isLoadingModel,
+                   'fa-check-circle text-green-400': isModelLoaded,
+                   'fa-times-circle text-red-400': !isModelLoaded && !isLoadingModel
+                 }"></i>
+              <div class="flex-1">
+                <div class="text-sm font-medium">Status</div>
+                <div class="text-xs" [ngClass]="getAIStatusClass()">
+                  {{ getAIStatusText() }}
+                </div>
+              </div>
+            </div>
+            
+            <div *ngIf="modelFileName" class="text-xs text-gray-400">
+              <strong>File:</strong> {{ modelFileName }}
+            </div>
+          </div>
+          
+          <!-- Messages -->
+          <div *ngIf="successMessage" class="alert alert-success mt-4">
+            <i class="fas fa-check-circle mr-2"></i>
+            {{ successMessage }}
+          </div>
+          
+          <div *ngIf="errorMessage" class="alert alert-error mt-4">
+            <i class="fas fa-exclamation-triangle mr-2"></i>
+            {{ errorMessage }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Game Setup Section -->
+      <div class="space-y-6">
+        <div class="card bg-gray-800 border border-gray-700 p-6">
+          <h2 class="text-xl font-semibold mb-4 flex items-center space-x-2">
+            <i class="fas fa-chess-board text-green-400"></i>
+            <span>Game Setup</span>
+          </h2>
+          
+          <div class="space-y-4 mb-6">
+            <div class="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
+              <i class="fas fa-user text-white text-lg"></i>
+              <span class="text-white font-medium">You play as White</span>
+            </div>
+            <div class="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
+              <i class="fas fa-robot text-blue-400 text-lg"></i>
+              <span class="text-blue-400 font-medium">AI plays as Black</span>
+            </div>
+            <div class="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
+              <i class="fas fa-chess-board text-green-400 text-lg"></i>
+              <span class="text-green-400 font-medium">Standard chess rules</span>
+            </div>
+          </div>
+          
+          <!-- Game Controls -->
+          <div class="space-y-3">
+            <button 
+              class="btn btn-success btn-large w-full"
+              [disabled]="!isModelLoaded || isLoadingModel"
+              (click)="startGameWithAI()"
+            >
+              <i class="fas fa-play mr-2"></i>
+              Start Game vs AI
+            </button>
+          </div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="card bg-gray-800 border border-gray-700 p-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center space-x-2">
+            <i class="fas fa-question-circle text-blue-400"></i>
+            <span>How to Use</span>
+          </h3>
+          <ol class="space-y-3 text-sm text-gray-300">
+            <li class="flex items-start space-x-3">
+              <span class="bg-blue-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center mt-0.5">1</span>
+              <span>Train an AI model using the Training mode</span>
+            </li>
+            <li class="flex items-start space-x-3">
+              <span class="bg-blue-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center mt-0.5">2</span>
+              <span>Download the trained model (creates .json and .weights.bin files)</span>
+            </li>
+            <li class="flex items-start space-x-3">
+              <span class="bg-blue-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center mt-0.5">3</span>
+              <span>Upload the model file(s) using one of the methods above</span>
+            </li>
+            <li class="flex items-start space-x-3">
+              <span class="bg-blue-500 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center mt-0.5">4</span>
+              <span>Start a game and play against your AI!</span>
+            </li>
+          </ol>
+          
+          <div class="mt-4 p-3 bg-blue-900 border border-blue-700 rounded-lg">
+            <p class="text-xs text-blue-200">
+              <i class="fas fa-lightbulb mr-2"></i>
+              <strong>Tip:</strong> If you get an error with the single file method, try the two files method instead.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 

@@ -1,0 +1,368 @@
+<div class="training-page">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-content">
+      <h1 class="title">Chess AI Training Lab</h1>
+      <button class="btn btn-secondary" (click)="returnToMenu()">
+        <i class="fas fa-arrow-left"></i> Back to Menu
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Layout Container -->
+  <div class="main-layout">
+    
+    <!-- Left Panel - Configuration Controls -->
+    <div class="left-panel">
+      <div class="control-panel">
+        <!-- Training Controls -->
+        <div class="training-controls">
+          <h3>Training Controls</h3>
+          <div class="control-group">
+            <button 
+              class="btn btn-primary" 
+              (click)="startTraining()" 
+              [disabled]="trainingState.isTraining">
+              <i class="fas fa-play"></i> Start Training
+            </button>
+            
+            <button 
+              class="btn btn-warning" 
+              (click)="pauseTraining()" 
+              [disabled]="!trainingState.isTraining || trainingState.isPaused">
+              <i class="fas fa-pause"></i> Pause
+            </button>
+            
+            <button 
+              class="btn btn-danger" 
+              (click)="stopTraining()" 
+              [disabled]="!trainingState.isTraining">
+              <i class="fas fa-stop"></i> Stop
+            </button>
+            
+            <button 
+              class="btn btn-info" 
+              (click)="resetTraining()">
+              <i class="fas fa-refresh"></i> Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Hyperparameters -->
+        <div class="hyperparameters">
+          <h3>Hyperparameters</h3>
+          <div class="param-grid">
+            <div class="param-item">
+              <label for="learningRate">Learning Rate</label>
+              <input
+                id="learningRate"
+                type="number"
+                min="0.0001"
+                max="0.1"
+                step="0.0001"
+                [(ngModel)]="trainingState.config.learningRate"
+                (input)="onConfigChange('learningRate', $event)"
+              />
+            </div>
+            
+            <div class="param-item">
+              <label for="numParallelGames">Parallel Games</label>
+              <input
+                id="numParallelGames"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                [(ngModel)]="trainingState.config.numParallelGames"
+                (input)="onConfigChange('numParallelGames', $event)"
+              />
+            </div>
+            
+            <div class="param-item">
+              <label for="batchSize">Batch Size</label>
+              <input
+                id="batchSize"
+                type="number"
+                min="16"
+                max="512"
+                step="16"
+                [(ngModel)]="trainingState.config.batchSize"
+                (input)="onConfigChange('batchSize', $event)"
+              />
+            </div>
+            
+            <div class="param-item">
+              <label for="mctsSimulations">MCTS Simulations</label>
+              <input
+                id="mctsSimulations"
+                type="number"
+                min="10"
+                max="1000"
+                step="10"
+                [(ngModel)]="trainingState.config.mctsSimulations"
+                (input)="onConfigChange('mctsSimulations', $event)"
+              />
+            </div>
+            
+            <div class="param-item">
+              <label for="temperature">Temperature</label>
+              <input
+                id="temperature"
+                type="number"
+                min="0.1"
+                max="2.0"
+                step="0.1"
+                [(ngModel)]="trainingState.config.temperature"
+                (input)="onConfigChange('temperature', $event)"
+              />
+            </div>
+            
+            <div class="param-item">
+              <label for="bufferSize">Buffer Size</label>
+              <input
+                id="bufferSize"
+                type="number"
+                min="1000"
+                max="100000"
+                step="1000"
+                [(ngModel)]="trainingState.config.bufferSize"
+                (input)="onConfigChange('bufferSize', $event)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Model Actions -->
+        <div class="model-actions">
+          <h3>Model</h3>
+          <div class="control-group">
+            <button 
+              class="btn btn-success" 
+              (click)="saveModel()">
+              <i class="fas fa-save"></i> Save Model
+            </button>
+            
+            <button 
+              class="btn btn-info" 
+              (click)="loadModel()">
+              <i class="fas fa-upload"></i> Load Model
+            </button>
+            
+            <button 
+              class="btn btn-primary" 
+              (click)="downloadModel()">
+              <i class="fas fa-download"></i> Download Model
+            </button>
+            
+            <button 
+              class="btn btn-secondary" 
+              (click)="exportTrainingData()">
+              <i class="fas fa-download"></i> Export Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center Panel - Game Visualization -->
+    <div class="center-panel">
+      <div class="game-visualization">
+        <div class="game-controls">
+          <h3>Live Training Games</h3>
+          
+          <!-- Performance Hint -->
+          <div class="performance-hint" *ngIf="showPerformanceHint">
+            <div class="hint-content">
+              <i class="fas fa-info-circle"></i>
+              <span>Many games running. Consider hiding visuals for better performance.</span>
+            </div>
+          </div>
+          
+          <!-- Visual Controls -->
+          <div class="visual-controls">
+            <button 
+              type="button"
+              class="btn btn-outline"
+              (click)="toggleGameVisuals()"
+            >
+              <i class="fas" [class.fa-eye]="!showGameVisuals" [class.fa-eye-slash]="showGameVisuals"></i>
+              {{ showGameVisuals ? 'Hide Visuals' : 'Show Visuals' }}
+            </button>
+            
+            <div class="game-stats">
+              {{ getGamesCountText() }}
+            </div>
+            
+            <!-- Load More Controls -->
+            <div class="load-more-controls" *ngIf="showGameVisuals && activeGames.length > 0">
+              <button 
+                type="button"
+                class="btn btn-secondary"
+                *ngIf="hasMoreGames()"
+                (click)="loadMoreGames()"
+              >
+                <i class="fas fa-plus"></i>
+                Load {{ LOAD_MORE_INCREMENT }} More
+              </button>
+              
+              <button 
+                type="button"
+                class="btn btn-info"
+                *ngIf="hasMoreGames()"
+                (click)="showAllGamesByToggle()"
+              >
+                <i class="fas fa-expand"></i>
+                Show All ({{ activeGames.length }})
+              </button>
+              
+              <button 
+                type="button"
+                class="btn btn-warning"
+                *ngIf="showAllGames && activeGames.length > DEFAULT_GAMES_LIMIT"
+                (click)="showLessGames()"
+              >
+                <i class="fas fa-compress"></i>
+                Show Less
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Game Boards Grid -->
+        <div class="games-grid" *ngIf="showGameVisuals">
+          <div 
+            class="game-board-wrapper"
+            *ngFor="let game of getVisibleGames(); trackBy: trackByGameId"
+            [class.selected]="isGameSelected(game.id)"
+            (click)="selectGame(game.id)"
+          >
+            <app-training-board
+              [board]="getGameBoard(game.id)"
+              [showVisuals]="showGameVisuals"
+              [gameId]="game.id"
+              [isSelected]="isGameSelected(game.id)"
+              [heatmapData]="getGameHeatmap(game.id)"
+              [showHeatmap]="selectedGameId === game.id && showGameDetails"
+            ></app-training-board>
+          </div>
+        </div>
+        
+        <!-- No Games Message -->
+        <div class="no-games" *ngIf="!showGameVisuals || activeGames.length === 0">
+          <div class="no-games-content">
+            <i class="fas" [ngClass]="trainingState.isTraining ? 'fa-spinner fa-spin' : 'fa-chess-board'"></i>
+            <h4>{{ trainingState.isTraining ? 'Initializing Training...' : 'No Active Games' }}</h4>
+            <p>{{ trainingState.isTraining ? 'Setting up self-play games and neural network...' : 'Start training to see live self-play games' }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Metrics and Charts -->
+    <div class="right-panel">
+      <!-- Status Dashboard -->
+      <div class="status-dashboard">
+        <h3>Training Status</h3>
+        <div class="status-cards">
+          <div class="status-card">
+            <h4>Status</h4>
+            <div class="status-value">
+              <span class="status-indicator" 
+                    [class.active]="trainingState.isTraining"
+                    [class.paused]="trainingState.isPaused">
+              </span>
+              {{ trainingState.isTraining ? (trainingState.isPaused ? 'Paused' : 'Training') : 'Stopped' }}
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Epoch</h4>
+            <div class="status-value">{{ trainingState.currentEpoch }}</div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Batches</h4>
+            <div class="status-value">{{ trainingState.totalBatches }}</div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Games</h4>
+            <div class="status-value">{{ selfPlayStats.gamesCompleted }}</div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Win Rate</h4>
+            <div class="status-value">{{ getWinRate() | number:'1.1-1' }}%</div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Elo</h4>
+            <div class="status-value">{{ getCurrentElo() | number:'1.0-0' }}</div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Backend</h4>
+            <div class="status-value" [ngClass]="getBackendStatusClass()">
+              {{ getBackendStatusText() }}
+            </div>
+          </div>
+          
+          <div class="status-card">
+            <h4>Memory</h4>
+            <div class="status-value">{{ getMemoryUsage() }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="chart-container">
+        <div class="chart-panel">
+          <h3>Training Metrics 
+            <i class="fas fa-spinner fa-spin" *ngIf="trainingState.isTraining && trainingState.totalBatches === 0"></i>
+          </h3>
+          <div #metricsContainer class="chart-content">
+            <div *ngIf="trainingState.isTraining && trainingState.totalBatches === 0" class="chart-loading">
+              <i class="fas fa-chart-line"></i>
+              <p>Waiting for training data...</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="chart-panel">
+          <h3>Elo Progression 
+            <i class="fas fa-spinner fa-spin" *ngIf="trainingState.isTraining && trainingState.totalBatches === 0"></i>
+          </h3>
+          <div #eloContainer class="chart-content">
+            <div *ngIf="trainingState.isTraining && trainingState.totalBatches === 0" class="chart-loading">
+              <i class="fas fa-trophy"></i>
+              <p>Calculating Elo progression...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Panel - Network Visualization and Logs -->
+  <div class="bottom-panel">
+    <div class="network-section">
+      <div class="network-controls">
+        <h3>Neural Network</h3>
+        <button 
+          class="btn btn-outline"
+          (click)="toggleNetworkViz()"
+        >
+          <i class="fas" [class.fa-eye]="!showNetworkViz" [class.fa-eye-slash]="showNetworkViz"></i>
+          {{ showNetworkViz ? 'Hide Network' : 'Show Network' }}
+        </button>
+      </div>
+      
+      <div class="network-content" *ngIf="showNetworkViz">
+        <app-network-visualizer
+          [weights]="networkWeights"
+          [activations]="layerActivations"
+        ></app-network-visualizer>
+      </div>
+    </div>
+  </div>
+</div> 

@@ -41,7 +41,11 @@ export class MainMenuComponent implements OnInit {
   }
 
   startPlayerVsAI(): void {
-    alert('This feature is coming soon!');
+    this.router.navigate(['/player-vs-ai']);
+  }
+  
+  startTraining(): void {
+    this.router.navigate(['/training']);
   }
   
   startCustomGame(): void {

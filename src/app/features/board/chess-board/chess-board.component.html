@@ -23,21 +23,42 @@
     <!-- Player Info - Top (Black) -->
     <div class="flex items-center bg-gray-800 rounded-lg p-2 w-full">
       <div class="flex items-center">
-        <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-700 mr-3">
-          <img 
-            [src]="gameStateService.isPlayerVsBot() ? 'assets/bot-avatar.png' : 'assets/player2-avatar.png'" 
-            alt="Player 2" 
-            class="w-full h-full object-cover">
+        <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-700 mr-3 flex items-center justify-center">
+          <i *ngIf="gameStateService.isPlayerVsAI()" class="fas fa-brain text-blue-400 text-xl"></i>
+          <i *ngIf="gameStateService.isPlayerVsBot()" class="fas fa-robot text-yellow-400 text-xl"></i>
+          <i *ngIf="gameStateService.isPlayerVsPlayer()" class="fas fa-user text-green-400 text-xl"></i>
         </div>
         <div>
-          <div class="font-bold">{{gameStateService.isPlayerVsBot() ? 'Bot' : 'Player 2'}}</div>
-          <div class="text-xs text-gray-400">Black</div>
+          <div class="font-bold flex items-center space-x-2">
+            <span>{{gameStateService.isPlayerVsAI() ? 'Your AI' : 
+                     gameStateService.isPlayerVsBot() ? 'Bot' : 'Player 2'}}</span>
+            <div *ngIf="gameStateService.isPlayerVsAI()" class="flex items-center space-x-1">
+              <i class="fas fa-brain text-blue-400 text-sm" title="Trained AI Model"></i>
+              <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse" 
+                   title="AI Model Active" 
+                   *ngIf="aiService.isReady"></div>
+              <div class="w-2 h-2 bg-red-400 rounded-full" 
+                   title="AI Model Not Ready" 
+                   *ngIf="!aiService.isReady"></div>
+            </div>
+          </div>
+          <div class="text-xs text-gray-400 flex items-center space-x-1">
+            <span>Black</span>
+            <span *ngIf="gameStateService.isPlayerVsAI()" class="text-blue-300">
+              • Neural Network
+            </span>
+            <span *ngIf="gameStateService.isPlayerVsBot()" class="text-yellow-300">
+              • Basic Bot
+            </span>
+          </div>
         </div>
       </div>
       <div class="ml-auto flex gap-2">
         <div *ngIf="board.currentPlayer === 'black'" 
-             class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse">
-          Thinking...
+             class="bg-yellow-600 px-2 py-1 rounded text-xs animate-pulse flex items-center space-x-1">
+          <i *ngIf="gameStateService.isPlayerVsAI()" class="fas fa-brain"></i>
+          <i *ngIf="gameStateService.isPlayerVsBot()" class="fas fa-robot"></i>
+          <span>{{gameStateService.isPlayerVsAI() ? 'AI Thinking...' : 'Thinking...'}}</span>
         </div>
       </div>
     </div>
@@ -218,6 +239,34 @@
   <!-- Game Info Panel -->
   <div class="md:w-80 bg-gray-800 p-4 rounded-lg ml-0 md:ml-4 mt-4 md:mt-0 flex flex-col shadow-xl game-info">
     <h2 class="text-2xl font-bold mb-6">Game Info</h2>
+    
+    <!-- Game Mode Indicator -->
+    <div class="mb-4 bg-gray-700 rounded-lg p-3">
+      <p class="text-sm text-gray-300 mb-2">Game Mode</p>
+      <div class="flex items-center space-x-2">
+        <div *ngIf="gameStateService.isPlayerVsAI()" class="flex items-center space-x-2">
+          <i class="fas fa-brain text-blue-400"></i>
+          <span class="text-blue-300 font-medium">Player vs Trained AI</span>
+          <div class="w-2 h-2 rounded-full" 
+               [class.bg-green-400]="aiService.isReady" 
+               [class.bg-red-400]="!aiService.isReady"
+               [class.animate-pulse]="aiService.isReady"
+               [title]="aiService.isReady ? 'AI Model Ready' : 'AI Model Not Ready'"></div>
+        </div>
+        <div *ngIf="gameStateService.isPlayerVsBot()" class="flex items-center space-x-2">
+          <i class="fas fa-robot text-yellow-400"></i>
+          <span class="text-yellow-300 font-medium">Player vs Bot</span>
+        </div>
+        <div *ngIf="gameStateService.isPlayerVsPlayer()" class="flex items-center space-x-2">
+          <i class="fas fa-users text-green-400"></i>
+          <span class="text-green-300 font-medium">Player vs Player</span>
+        </div>
+        <div *ngIf="gameStateService.isCustomGame()" class="flex items-center space-x-2">
+          <i class="fas fa-chess-board text-purple-400"></i>
+          <span class="text-purple-300 font-medium">Custom Game</span>
+        </div>
+      </div>
+    </div>
     
     <!-- Current Turn -->
     <div class="mb-6 bg-gray-700 rounded-lg p-4">

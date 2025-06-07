@@ -13,6 +13,16 @@ export const routes: Routes = [
     data: { animation: 'game' }
   },
   {
+    path: 'player-vs-ai',
+    loadComponent: () => import('./features/ai/player-vs-ai/player-vs-ai.component').then(m => m.PlayerVsAIComponent),
+    data: { animation: 'ai' }
+  },
+  {
+    path: 'training',
+    loadComponent: () => import('./features/training/training-page/training-page.component').then(m => m.TrainingPageComponent),
+    data: { animation: 'training' }
+  },
+  {
     path: 'settings',
     loadComponent: () => import('./features/settings/settings/settings.component').then(m => m.SettingsComponent),
     data: { animation: 'settings' }
